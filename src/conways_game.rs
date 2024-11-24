@@ -1,8 +1,12 @@
-use std::{i64, usize};
+use std::{i64, time::Duration, usize};
 
-use crate::conways_law;
+use crate::{
+    conways_law,
+    terminal_formatter::{self, TerminalColors},
+};
 use rand::prelude::*;
 use rand_chacha;
+use std::thread::sleep;
 
 #[allow(dead_code)]
 pub struct ConwaysGame {
@@ -10,8 +14,15 @@ pub struct ConwaysGame {
     _y_len: usize,
     current: Vec<Vec<bool>>,
     previous: Vec<Vec<bool>>,
+    state: GameState,
 }
-#[allow(dead_code)]
+pub enum GameState {
+    INITIALIZED,
+    RUNNING,
+    PAUSED,
+    DONE,
+}
+
 impl ConwaysGame {
     ///Initialize an instance of ConwaysGame
     ///
@@ -36,6 +47,7 @@ impl ConwaysGame {
         let mut _rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
 
         let mut new_state = vec![vec![false; x_len]; y_len];
+        let new_prev = new_state.clone();
         for y in 0..y_len {
             for x in 0..x_len {
                 new_state[y][x] = _rng.gen();
@@ -43,10 +55,50 @@ impl ConwaysGame {
         }
         ConwaysGame {
             current: new_state.clone(),
-            previous: new_state.clone(),
+            previous: new_prev,
             _x_len: x_len,
             _y_len: y_len,
+            state: GameState::INITIALIZED,
         }
+    }
+
+    /// Run the game with the specified time between next calls
+    ///
+    /// # Arguments
+    ///
+    /// * `duration` - duration between `next` calls
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let game = ConwaysGame::init(1,9001,42);
+    /// let dur = Duration::from_millis(1000);
+    /// game.run(dur);
+    /// ```
+    pub fn run(&mut self, duration: Duration) {
+        terminal_formatter::reset_terminal();
+        terminal_formatter::hide_cursor();
+        while !matches!(self.state, GameState::DONE) {
+            sleep(duration);
+            self.next();
+            self.debug_print();
+            if self.is_stable() {
+                break;
+            }
+        }
+        terminal_formatter::show_cursor();
+        terminal_formatter::reset_colors();
+    }
+    /// Checks if the next and previous frames are the same
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// game.is_stable();
+    ///
+    /// ```
+    pub fn is_stable(&mut self) -> bool {
+        self.previous.eq(&self.current)
     }
 
     /// Print the current state in the console
@@ -62,29 +114,25 @@ impl ConwaysGame {
     /// O O O
     /// O O X
     pub fn debug_print(&mut self) {
+        terminal_formatter::set_cursor_location(1, 1);
         for y in 0..self._y_len {
             for x in 0..self._x_len {
                 let cell = self.current[y][x];
                 if cell {
-                    print!(
-                        "\x1b[38;5;232;48;5;120m X |x:{},y:{},sib:{}| ",
-                        x,
-                        y,
-                        self.count_siblings(x, y)
-                    );
+                    terminal_formatter::set_background(TerminalColors::LightGreen);
+                    terminal_formatter::set_foreground(TerminalColors::Black);
+                    print!(" X |x:{},y:{},sib:{}| ", x, y, self.count_siblings(x, y));
                 } else {
-                    print!(
-                        "\x1b[38;5;231;48;5;160m O |x:{},y:{},sib:{}| ",
-                        x,
-                        y,
-                        self.count_siblings(x, y)
-                    );
+                    terminal_formatter::set_background(TerminalColors::Red);
+                    terminal_formatter::set_foreground(TerminalColors::White);
+                    print!(" O |x:{},y:{},sib:{}| ", x, y, self.count_siblings(x, y));
                 }
             }
             print!("\n");
         }
     }
-    /// Calculate and apply the next frame
+    /// Calculate and apply the next frame, while the calculations are running the current and the
+    /// previous are the same
     ///
     /// # Examples
     ///
@@ -112,7 +160,7 @@ impl ConwaysGame {
         );
         self.current = new_state;
     }
-    /// Count the number of living siblings at a location
+    /// Count the number of living siblings at a location on the previous state
     ///
     /// # Arguments
     ///
@@ -147,7 +195,7 @@ impl ConwaysGame {
                 assert!(y_sibling >= 0);
                 assert!(x_sibling < self._x_len as i64);
                 assert!(y_sibling < self._y_len as i64);
-                if self.current[y_sibling as usize][x_sibling as usize] {
+                if self.previous[y_sibling as usize][x_sibling as usize] {
                     sibling_count += 1;
                 }
             }
