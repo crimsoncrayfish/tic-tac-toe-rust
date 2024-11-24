@@ -1,26 +1,36 @@
-use std::{i64, time::Duration, usize};
-
-use crate::{
-    conways_law,
-    terminal_formatter::{self, TerminalColors},
-};
 use rand::prelude::*;
 use rand_chacha;
 use std::thread::sleep;
+use std::{i64, time::Duration, usize};
 
-#[allow(dead_code)]
-pub struct ConwaysGame {
-    _x_len: usize,
-    _y_len: usize,
-    current: Vec<Vec<bool>>,
-    previous: Vec<Vec<bool>>,
-    state: GameState,
-}
+use crate::conways_law::conways_law;
+use crate::terminal_formatter;
+
 pub enum GameState {
     INITIALIZED,
     RUNNING,
     PAUSED,
     DONE,
+}
+#[derive(PartialEq, Clone, Copy)]
+pub enum PrintMode {
+    PRETTY,
+    DEBUG,
+}
+
+pub struct ConwaysGame {
+    current: Vec<Vec<bool>>,
+    previous: Vec<Vec<bool>>,
+    state: GameState,
+    rounds: u64,
+    settings: ConwaysSettings,
+    out: terminal_formatter::Terminal,
+}
+pub struct ConwaysSettings {
+    x_len: usize,
+    y_len: usize,
+    cell_view_width: u16,
+    cell_view_height: u16,
 }
 
 impl ConwaysGame {
@@ -56,9 +66,15 @@ impl ConwaysGame {
         ConwaysGame {
             current: new_state.clone(),
             previous: new_prev,
-            _x_len: x_len,
-            _y_len: y_len,
+            out: terminal_formatter::Terminal::init(),
             state: GameState::INITIALIZED,
+            rounds: 0,
+            settings: ConwaysSettings {
+                x_len,
+                y_len,
+                cell_view_width: 3,
+                cell_view_height: 2,
+            },
         }
     }
 
@@ -76,18 +92,24 @@ impl ConwaysGame {
     /// game.run(dur);
     /// ```
     pub fn run(&mut self, duration: Duration) {
-        terminal_formatter::reset_terminal();
-        terminal_formatter::hide_cursor();
+        {
+            self.out.lock();
+            self.out.clear();
+            self.out.hide_cursor();
+        }
         while !matches!(self.state, GameState::DONE) {
             sleep(duration);
             self.next();
-            self.debug_print();
+            self.print(PrintMode::DEBUG);
+            self.out.flush();
+            self.rounds += 1;
             if self.is_stable() {
                 break;
             }
         }
-        terminal_formatter::show_cursor();
-        terminal_formatter::reset_colors();
+        self.out.lock();
+        self.out.show_cursor();
+        self.out.reset_colors();
     }
     /// Checks if the next and previous frames are the same
     ///
@@ -101,34 +123,139 @@ impl ConwaysGame {
         self.previous.eq(&self.current)
     }
 
-    /// Print the current state in the console
+    /// Pretty print the current state
     ///
     /// # Examples
     ///
     /// ```
-    /// game.debug_print();
+    /// game.print(PrintMode::Pretty);
     ///
     /// ```
     /// prints the following:
     /// X O X
     /// O O O
     /// O O X
-    pub fn debug_print(&mut self) {
-        terminal_formatter::set_cursor_location(1, 1);
-        for y in 0..self._y_len {
-            for x in 0..self._x_len {
-                let cell = self.current[y][x];
-                if cell {
-                    terminal_formatter::set_background(TerminalColors::LightGreen);
-                    terminal_formatter::set_foreground(TerminalColors::Black);
-                    print!(" X |x:{},y:{},sib:{}| ", x, y, self.count_siblings(x, y));
-                } else {
-                    terminal_formatter::set_background(TerminalColors::Red);
-                    terminal_formatter::set_foreground(TerminalColors::White);
-                    print!(" O |x:{},y:{},sib:{}| ", x, y, self.count_siblings(x, y));
+    pub fn print(&mut self, print_mode: PrintMode) {
+        self.out.lock();
+        for y in 0..self.settings.y_len {
+            for x in 0..self.settings.x_len {
+                self.print_cell(x as u16, y as u16, self.current[y][x], print_mode);
+            }
+        }
+        if print_mode == PrintMode::DEBUG {
+            let x_start = 0;
+            let y_start = (self.settings.y_len as u16 * self.settings.cell_view_height)
+                + 1
+                + self.settings.y_len as u16;
+            self.out.set_cursor_location(x_start, y_start);
+            self.out
+                .set_background(terminal_formatter::TerminalColors::White);
+            self.out
+                .set_foreground(terminal_formatter::TerminalColors::Red);
+            self.out.write(format!("Round {}", self.rounds));
+        }
+    }
+    fn print_cell(&mut self, x: u16, y: u16, is_alive: bool, print_mode: PrintMode) {
+        let debug_width: u16 = 6;
+        match print_mode {
+            PrintMode::PRETTY => {
+                let x_start = x * self.settings.cell_view_width + 1 + x;
+                let y_start = (y * self.settings.cell_view_height) + 1 + y;
+                for y_offset in 0..self.settings.cell_view_height {
+                    for x_offset in 0..self.settings.cell_view_width {
+                        self.out
+                            .set_cursor_location(x_start + x_offset, y_start + y_offset);
+                        if is_alive {
+                            self.out
+                                .set_background(terminal_formatter::TerminalColors::LightGreen);
+                            self.out
+                                .set_foreground(terminal_formatter::TerminalColors::Black);
+                        } else {
+                            self.out
+                                .set_background(terminal_formatter::TerminalColors::Red);
+                            self.out
+                                .set_foreground(terminal_formatter::TerminalColors::White);
+                        }
+                        self.out.write(" ".to_string());
+                    }
                 }
             }
-            print!("\n");
+            PrintMode::DEBUG => {
+                let x_start = x * self.settings.cell_view_width + 1 + x + x * debug_width;
+                let y_start = (y * self.settings.cell_view_height) + 1 + y;
+                for y_offset in 0..self.settings.cell_view_height {
+                    for x_offset in 0..self.settings.cell_view_width {
+                        self.out
+                            .set_cursor_location(x_start + x_offset, y_start + y_offset);
+                        if is_alive {
+                            self.out
+                                .set_background(terminal_formatter::TerminalColors::LightGreen);
+                            self.out
+                                .set_foreground(terminal_formatter::TerminalColors::Black);
+                        } else {
+                            self.out
+                                .set_background(terminal_formatter::TerminalColors::Red);
+                            self.out
+                                .set_foreground(terminal_formatter::TerminalColors::White);
+                        }
+                        self.out.write(format!(
+                            "{}",
+                            y_offset * self.settings.cell_view_height + x_offset + y_offset
+                        ));
+                    }
+                }
+                for y_offset in 0..self.settings.cell_view_height {
+                    for x_offset in 0..debug_width {
+                        self.out.set_cursor_location(
+                            x_start + self.settings.cell_view_width + x_offset,
+                            y_start + y_offset,
+                        );
+                        if is_alive {
+                            self.out
+                                .set_background(terminal_formatter::TerminalColors::LightGreen);
+                            self.out
+                                .set_foreground(terminal_formatter::TerminalColors::Black);
+                        } else {
+                            self.out
+                                .set_background(terminal_formatter::TerminalColors::Red);
+                            self.out
+                                .set_foreground(terminal_formatter::TerminalColors::White);
+                        }
+                        self.out.write(" ".to_string());
+                    }
+                }
+                self.out
+                    .set_cursor_location(x_start + self.settings.cell_view_width, y_start);
+
+                if is_alive {
+                    self.out
+                        .set_background(terminal_formatter::TerminalColors::LightGreen);
+                    self.out
+                        .set_foreground(terminal_formatter::TerminalColors::Black);
+                    self.out.write(" true ".to_string());
+                } else {
+                    self.out
+                        .set_background(terminal_formatter::TerminalColors::Red);
+                    self.out
+                        .set_foreground(terminal_formatter::TerminalColors::White);
+                    self.out.write(" false".to_string());
+                }
+                self.out
+                    .set_cursor_location(x_start + self.settings.cell_view_width, y_start + 1);
+
+                if is_alive {
+                    self.out
+                        .set_background(terminal_formatter::TerminalColors::LightGreen);
+                    self.out
+                        .set_foreground(terminal_formatter::TerminalColors::Black);
+                } else {
+                    self.out
+                        .set_background(terminal_formatter::TerminalColors::Red);
+                    self.out
+                        .set_foreground(terminal_formatter::TerminalColors::White);
+                }
+                self.out.write(format!(" {}:{}", x, y));
+            }
         }
     }
     /// Calculate and apply the next frame, while the calculations are running the current and the
@@ -141,20 +268,20 @@ impl ConwaysGame {
     /// ```
     pub fn next(&mut self) {
         self.previous = self.current.clone();
-        let mut new_state = vec![vec![false; self._x_len]; self._y_len];
-        for y in 0..self._y_len {
-            for x in 0..self._x_len {
+        let mut new_state = vec![vec![false; self.settings.x_len]; self.settings.y_len];
+        for y in 0..self.settings.y_len {
+            for x in 0..self.settings.x_len {
                 let live_siblings = self.count_siblings(x, y);
-                new_state[y][x] = conways_law::conways_law(self.current[y][x], live_siblings);
+                new_state[y][x] = conways_law(self.current[y][x], live_siblings);
             }
             assert_eq!(
-                self._x_len,
+                self.settings.x_len,
                 new_state[y].len(),
                 "the length of the row should not change"
             );
         }
         assert_eq!(
-            self._y_len,
+            self.settings.y_len,
             new_state.len(),
             "the number of rows should not change"
         );
@@ -181,21 +308,21 @@ impl ConwaysGame {
                 }
                 let mut x_sibling = (x_location as i64) + x_delta;
                 if x_sibling < 0 {
-                    x_sibling = (self._x_len as i64) - 1;
-                } else if x_sibling >= self._x_len as i64 {
+                    x_sibling = (self.settings.x_len as i64) - 1;
+                } else if x_sibling >= self.settings.x_len as i64 {
                     x_sibling = 0;
                 }
                 let mut y_sibling = (y_location as i64) + y_delta;
                 if y_sibling < 0 {
-                    y_sibling = (self._y_len as i64) - 1;
-                } else if y_sibling >= self._y_len as i64 {
+                    y_sibling = (self.settings.y_len as i64) - 1;
+                } else if y_sibling >= self.settings.y_len as i64 {
                     y_sibling = 0;
                 }
                 assert!(x_sibling >= 0);
                 assert!(y_sibling >= 0);
-                assert!(x_sibling < self._x_len as i64);
-                assert!(y_sibling < self._y_len as i64);
-                if self.previous[y_sibling as usize][x_sibling as usize] {
+                assert!(x_sibling < self.settings.x_len as i64);
+                assert!(y_sibling < self.settings.y_len as i64);
+                if self.current[y_sibling as usize][x_sibling as usize] {
                     sibling_count += 1;
                 }
             }

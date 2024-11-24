@@ -1,12 +1,9 @@
-pub fn reset_terminal() {
-    println!("\x1Bc");
+use std::io::{Stdout, Write};
+
+pub struct Terminal {
+    pub buffer: Stdout,
 }
-pub fn hide_cursor() {
-    print!("\x1B[?25l");
-}
-pub fn show_cursor() {
-    print!("\x1B[?25h");
-}
+
 pub enum TerminalColors {
     LightGreen = 120,
     Red = 160,
@@ -15,45 +12,102 @@ pub enum TerminalColors {
     HotPink = 200,
 }
 
-// Prints the ansi characters that sets the terminal background color at the current cursor
-// location
-//
-// # Example
-// ```
-// terminal_formatter::set_background(TerminalColors::HotPink);
-// ```
-pub fn set_background(color_code: TerminalColors) {
-    print!("\x1b[48;5;{}m", color_code as u32);
-}
+impl Terminal {
+    // Initialize an instance of the terminal struct
+    //
+    // # Example
+    // ```
+    // let term = terminal_formatter::init();
+    // ```
+    pub fn init() -> Self {
+        Terminal {
+            buffer: std::io::stdout(),
+        }
+    }
+    pub fn write(&mut self, val: String) {
+        let _ = write!(self.buffer, "{}", val);
+    }
+    pub fn flush(&mut self) {
+        let _ = self.buffer.flush();
+    }
 
-// Prints the ansi characters that sets the terminal foreground color at the current cursor
-// location
-//
-// # Example
-// ```
-// terminal_formatter::set_foreground(TerminalColors::HotPink);
-// ```
-pub fn set_foreground(color_code: TerminalColors) {
-    print!("\x1b[38;5;{}m", color_code as u32);
-}
+    // Lock the output
+    //
+    // # Example
+    // ```
+    // terminal_formatter.lock();
+    // ```
+    pub fn lock(&mut self) {
+        let _ = self.buffer.lock();
+    }
 
-// Prints the ansi characters that sets the cursor location on the terminal
-//
-// # Example
-// ```
-// terminal_formatter::set_cursor_location(0,0);
-// ```
-pub fn set_cursor_location(x: u16, y: u16) {
-    print!("\x1b[{};{}H", y, x);
-}
+    // Clear the terminal
+    //
+    // # Example
+    // ```
+    // terminal_formatter.clear();
+    // ```
+    pub fn clear(&mut self) {
+        let _ = write!(self.buffer, "\x1Bc");
+    }
+    // Hide the cursor
+    //
+    // # Example
+    // ```
+    // terminal_formatter.hide_cursor();
+    // ```
+    pub fn hide_cursor(&mut self) {
+        let _ = write!(self.buffer, "\x1B[?25l");
+    }
+    // Show the cursor
+    //
+    // # Example
+    // ```
+    // terminal_formatter.show_cursor();
+    // ```
+    pub fn show_cursor(&mut self) {
+        let _ = write!(self.buffer, "\x1B[?25h");
+    }
+    // Prints the ansi characters that sets the terminal background color at the current cursor
+    // location
+    //
+    // # Example
+    // ```
+    // terminal_formatter.set_background(TerminalColors::HotPink);
+    // ```
+    pub fn set_background(&mut self, color_code: TerminalColors) {
+        let _ = write!(self.buffer, "\x1b[48;5;{}m", color_code as u32);
+    }
 
-// Reset terminal colors and styles
-// location
-//
-// # Example
-// ```
-// terminal_formatter::reset_colors();
-// ```
-pub fn reset_colors() {
-    print!("\x1b[0m");
+    // Prints the ansi characters that sets the terminal foreground color at the current cursor
+    // location
+    //
+    // # Example
+    // ```
+    // terminal_formatter.set_foreground(TerminalColors::HotPink);
+    // ```
+    pub fn set_foreground(&mut self, color_code: TerminalColors) {
+        let _ = write!(self.buffer, "\x1b[38;5;{}m", color_code as u32);
+    }
+
+    // Prints the ansi characters that sets the cursor location on the terminal
+    //
+    // # Example
+    // ```
+    // terminal_formatter.set_cursor_location(0,0);
+    // ```
+    pub fn set_cursor_location(&mut self, x: u16, y: u16) {
+        let _ = write!(self.buffer, "\x1b[{};{}H", y, x);
+    }
+
+    // Reset terminal colors and styles
+    // location
+    //
+    // # Example
+    // ```
+    // terminal_formatter::reset_colors();
+    // ```
+    pub fn reset_colors(&mut self) {
+        let _ = write!(self.buffer, "\x1B[0m");
+    }
 }
