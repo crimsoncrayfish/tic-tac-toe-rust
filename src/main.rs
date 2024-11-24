@@ -13,7 +13,7 @@ fn main() {
     let mut x_len: usize = 10;
     let mut y_len: usize = 10;
     let mut seed: u64 = 10;
-    let mut print_mode: PrintMode = PrintMode::DEBUG;
+    let mut print_mode: PrintMode = PrintMode::PRETTY;
 
     for i in 1..args.len() {
         match args[i].as_str() {
