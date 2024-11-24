@@ -1,5 +1,6 @@
 use rand::prelude::*;
 use rand_chacha;
+use std::str::FromStr;
 use std::thread::sleep;
 use std::{i64, time::Duration, usize};
 
@@ -16,6 +17,16 @@ pub enum GameState {
 pub enum PrintMode {
     PRETTY,
     DEBUG,
+}
+impl FromStr for PrintMode {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "pretty" | "PRETTY" => Ok(PrintMode::PRETTY),
+            "debug" | "DEBUG" => Ok(PrintMode::DEBUG),
+            _ => Err(format!("`{}` is not a valid mode", s)),
+        }
+    }
 }
 
 pub struct ConwaysGame {
@@ -91,7 +102,7 @@ impl ConwaysGame {
     /// let dur = Duration::from_millis(1000);
     /// game.run(dur);
     /// ```
-    pub fn run(&mut self, duration: Duration) {
+    pub fn run(&mut self, duration: Duration, print_mode: PrintMode) {
         {
             self.out.lock();
             self.out.clear();
@@ -100,7 +111,7 @@ impl ConwaysGame {
         while !matches!(self.state, GameState::DONE) {
             sleep(duration);
             self.next();
-            self.print(PrintMode::DEBUG);
+            self.print(print_mode);
             self.out.flush();
             self.rounds += 1;
             if self.is_stable() {
