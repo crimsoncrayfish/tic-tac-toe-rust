@@ -9,6 +9,7 @@
 
 - [x] Make conways game of life
 - [ ] Make lib that can help with applying ansi escape sequences to the terminal
+    - [x] Basic lib
 - [ ] Make input handler that can capture inputs
     - [ ] quit game with 'q'
     - [ ] pause/resume game with 'space'
