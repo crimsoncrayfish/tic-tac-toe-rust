@@ -1,10 +1,13 @@
 use std::fmt::Display;
-use winapi::shared::minwindef::{BOOL, DWORD, LPDWORD};
-use winapi::um::consoleapi::{GetConsoleMode, SetConsoleMode};
+use winapi::shared::minwindef::{DWORD, LPDWORD};
+use winapi::um::consoleapi::{GetConsoleMode, ReadConsoleInputA, SetConsoleMode};
 use winapi::um::handleapi::INVALID_HANDLE_VALUE;
 use winapi::um::processenv::GetStdHandle;
 use winapi::um::winbase::STD_INPUT_HANDLE;
-use winapi::um::wincon::{ENABLE_ECHO_INPUT, ENABLE_LINE_INPUT, ENABLE_PROCESSED_INPUT};
+use winapi::um::wincon::{
+    ENABLE_ECHO_INPUT, ENABLE_LINE_INPUT, ENABLE_PROCESSED_INPUT, INPUT_RECORD,
+};
+use winapi::um::wincontypes::PINPUT_RECORD;
 use winapi::um::winnt::HANDLE;
 
 #[derive(Debug)]
@@ -60,6 +63,7 @@ impl ConsoleControl {
             }
         }
     }
+
     fn get_console_mode_raw(&self) -> Result<DWORD, ConsoleControlErr> {
         let mut mode: DWORD = 0;
         let success = unsafe { GetConsoleMode(self.handle, &mut mode as LPDWORD) };
@@ -81,6 +85,7 @@ impl ConsoleControl {
         }
         return Ok(());
     }
+
     pub fn set_cooked_mode(&self) -> Result<(), ConsoleControlErr> {
         let mut mode: DWORD = self.get_console_mode_raw()?;
         mode |= ENABLE_ECHO_INPUT;
@@ -101,6 +106,7 @@ pub enum ConsoleMode {
     Uncooked,
     None,
 }
+
 impl Display for ConsoleMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
