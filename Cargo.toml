@@ -6,4 +6,9 @@ edition = "2021"
 [dependencies]
 rand = "0.8.5"
 rand_chacha = "0.3.1"
-winapi = { version = "0.3.9", features = ["consoleapi", "processenv","winbase","handleapi"]}
+
+[dependencies.windows-sys]
+version = "0.59"
+features = [
+    "Win32_System_Console"
+]

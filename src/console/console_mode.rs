@@ -1,14 +1,9 @@
 use std::fmt::Display;
-use winapi::shared::minwindef::{DWORD, LPDWORD};
-use winapi::um::consoleapi::{GetConsoleMode, ReadConsoleInputA, SetConsoleMode};
-use winapi::um::handleapi::INVALID_HANDLE_VALUE;
-use winapi::um::processenv::GetStdHandle;
-use winapi::um::winbase::STD_INPUT_HANDLE;
-use winapi::um::wincon::{
-    ENABLE_ECHO_INPUT, ENABLE_LINE_INPUT, ENABLE_PROCESSED_INPUT, INPUT_RECORD,
+use windows_sys::Win32::Foundation::{HANDLE, INVALID_HANDLE_VALUE};
+use windows_sys::Win32::System::Console::{
+    GetConsoleMode, GetStdHandle, SetConsoleMode, CONSOLE_MODE, ENABLE_ECHO_INPUT,
+    ENABLE_LINE_INPUT, ENABLE_PROCESSED_INPUT, STD_INPUT_HANDLE,
 };
-use winapi::um::wincontypes::PINPUT_RECORD;
-use winapi::um::winnt::HANDLE;
 
 #[derive(Debug)]
 pub enum ConsoleControlErr {
@@ -38,7 +33,7 @@ impl ConsoleControl {
     }
 
     pub fn get_console_mode(&mut self) -> Result<ConsoleMode, ConsoleControlErr> {
-        let mode: DWORD = self.get_console_mode_raw()?;
+        let mode: CONSOLE_MODE = self.get_console_mode_raw()?;
         match mode {
             x if ((x & ENABLE_ECHO_INPUT) != 0
                 && (x & ENABLE_PROCESSED_INPUT) != 0
@@ -64,9 +59,9 @@ impl ConsoleControl {
         }
     }
 
-    fn get_console_mode_raw(&self) -> Result<DWORD, ConsoleControlErr> {
-        let mut mode: DWORD = 0;
-        let success = unsafe { GetConsoleMode(self.handle, &mut mode as LPDWORD) };
+    fn get_console_mode_raw(&self) -> Result<CONSOLE_MODE, ConsoleControlErr> {
+        let mut mode: CONSOLE_MODE = 0;
+        let success = unsafe { GetConsoleMode(self.handle, &mut mode) };
         if success == 0 {
             return Err(ConsoleControlErr::NoModeResponse);
         }
@@ -74,7 +69,7 @@ impl ConsoleControl {
     }
 
     pub fn set_uncooked_mode(&self) -> Result<(), ConsoleControlErr> {
-        let mut mode: DWORD = self.get_console_mode_raw()?;
+        let mut mode = self.get_console_mode_raw()?;
         mode &= !ENABLE_ECHO_INPUT;
         mode &= !ENABLE_LINE_INPUT;
         mode &= !ENABLE_PROCESSED_INPUT;
@@ -87,7 +82,7 @@ impl ConsoleControl {
     }
 
     pub fn set_cooked_mode(&self) -> Result<(), ConsoleControlErr> {
-        let mut mode: DWORD = self.get_console_mode_raw()?;
+        let mut mode = self.get_console_mode_raw()?;
         mode |= ENABLE_ECHO_INPUT;
         mode |= ENABLE_LINE_INPUT;
         mode |= ENABLE_PROCESSED_INPUT;
