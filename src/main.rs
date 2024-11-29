@@ -1,9 +1,9 @@
 use std::str::FromStr;
 
-use console::console_mode::{ConsoleControl, ConsoleControlErr};
+use console::console_control::{ConsoleControl, ConsoleControlErr};
 
 pub mod console {
-    pub mod console_mode;
+    pub mod console_control;
 }
 pub mod conways_game;
 pub mod conways_law;
@@ -30,7 +30,10 @@ fn main() -> Result<(), ConsoleControlErr> {
         Ok(_) => println!("updated mode"),
         Err(e) => return Err(e),
     }
+    let ch = cm.read_console_input()?;
+    println!("{}", ch);
     let mode = cm.get_console_mode()?;
+
     print!("mode: {}\n", mode);
     match cm.set_cooked_mode() {
         Ok(_) => println!("updated mode"),
