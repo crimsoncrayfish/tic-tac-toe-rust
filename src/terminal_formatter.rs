@@ -27,6 +27,9 @@ impl Terminal {
     pub fn write(&mut self, val: String) {
         let _ = write!(self.buffer, "{}", val);
     }
+    pub fn writeln(&mut self, val: String) {
+        let _ = writeln!(self.buffer, "\x1b[2K{}", val);
+    }
     pub fn flush(&mut self) {
         let _ = self.buffer.flush();
     }

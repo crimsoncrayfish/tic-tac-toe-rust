@@ -71,16 +71,20 @@ impl ConsoleControl {
         Ok(mode)
     }
 
-    pub fn read_console_input(&self) -> Result<char, ConsoleControlErr> {
-        let input_rec = self.get_console_input_raw()?;
-        println!("Received input {}", unsafe {
-            input_rec.Event.KeyEvent.uChar.UnicodeChar
-        });
+    pub fn read_console_input(&self) -> Result<ConsoleCommand, ConsoleControlErr> {
+        let input_rec: INPUT_RECORD = self.read_console_input_raw()?;
 
-        Ok(char::from_u32(unsafe { input_rec.Event.KeyEvent.uChar.UnicodeChar as u32 }).unwrap())
+        //todo: figure our this union thing
+        let cmd = ConsoleCommand {
+            command: char::from_u32(unsafe { input_rec.Event.KeyEvent.uChar.UnicodeChar as u32 })
+                .unwrap(),
+            repreat_count: unsafe { input_rec.Event.KeyEvent.wRepeatCount },
+            is_down: unsafe { input_rec.Event.KeyEvent.bKeyDown } == 1,
+        };
+        Ok(cmd)
     }
 
-    fn get_console_input_raw(&self) -> Result<INPUT_RECORD, ConsoleControlErr> {
+    fn read_console_input_raw(&self) -> Result<INPUT_RECORD, ConsoleControlErr> {
         let mut event_count: u32 = 0;
         let mut input_rec: INPUT_RECORD = new_input_rec();
         let success =
@@ -153,4 +157,10 @@ fn new_input_rec() -> INPUT_RECORD {
         EventType: 0,
         Event: event,
     }
+}
+#[derive(Clone)]
+pub struct ConsoleCommand {
+    pub command: char,
+    pub repreat_count: u16,
+    pub is_down: bool,
 }
