@@ -1,26 +1,33 @@
-use core::time;
 use std::{
     env,
     str::FromStr,
-    sync::mpsc::{self, Receiver, Sender},
-    thread::{spawn, JoinHandle},
+    sync::mpsc::{self},
 };
 
-use console::console_control::{ConsoleCommand, ConsoleControl, ConsoleControlErr};
-use conways_game::PrintMode;
+use console::errors::ConsoleControlErr;
+use console::notify_inputs;
+use conway::{conways_game, print_mode::PrintMode};
 
 pub mod console {
     pub mod console_control;
+    pub mod errors;
+    pub mod mode;
+    pub mod notify_inputs;
 }
-pub mod conways_game;
-pub mod conways_law;
+pub mod conway {
+    pub mod command;
+    pub mod conways_game;
+    pub mod conways_law;
+    pub mod print_mode;
+    pub mod settings;
+}
+
 pub mod coordinate;
-pub mod input_handler;
 pub mod terminal_formatter;
 
 fn main() -> Result<(), ConsoleControlErr> {
     let (transmitter, receiver) = mpsc::channel();
-    let _handle = spawn_input_thread(transmitter);
+    let _handle = notify_inputs::listen_and_notify_inputs(transmitter);
 
     let args: Vec<String> = env::args().collect();
 
@@ -28,7 +35,7 @@ fn main() -> Result<(), ConsoleControlErr> {
     let y_len: usize = read_config(&args, "--y-len".to_string(), 7);
     let seed: u64 = read_config(&args, "--seed".to_string(), 419);
     let print_mode: PrintMode = read_config(&args, "--mode".to_string(), PrintMode::PRETTY);
-    let _ = spawn_game_thread(x_len, y_len, seed, print_mode, receiver)
+    let _ = conways_game::ConwaysGame::run_async(x_len, y_len, seed, print_mode, receiver)
         .join()
         .unwrap();
 
@@ -54,55 +61,4 @@ where
     }
 
     out
-}
-fn spawn_input_thread(sender: Sender<ConsoleCommand>) -> JoinHandle<Result<(), ConsoleControlErr>> {
-    let read_input_closure = move || -> Result<(), ConsoleControlErr> {
-        // TODO: Handle this err
-        let cm = ConsoleControl::init()?;
-        match cm.set_uncooked_mode() {
-            Ok(_) => (),
-            Err(e) => return Err(e),
-        }
-        loop {
-            // TODO: Handle this err
-            let ch = cm.read_console_input()?;
-
-            match sender.send(ch.clone()) {
-                Ok(_) => (),
-                Err(e) => {
-                    eprintln!(
-                        "Exception occurred when sending command on channel with error: {}",
-                        e
-                    );
-                    break;
-                }
-            }
-
-            if ch.command == 'q' {
-                break;
-            }
-        }
-
-        match cm.set_cooked_mode() {
-            Ok(_) => (),
-            Err(e) => return Err(e),
-        }
-
-        Ok(())
-    };
-    spawn(read_input_closure)
-}
-fn spawn_game_thread(
-    x_len: usize,
-    y_len: usize,
-    seed: u64,
-    print_mode: PrintMode,
-    receiver: Receiver<ConsoleCommand>,
-) -> JoinHandle<()> {
-    let game_closure = move || {
-        let mut gs = conways_game::ConwaysGame::init(x_len, y_len, seed, print_mode, receiver);
-        let duration = time::Duration::from_millis(1000);
-        gs.run(duration);
-    };
-    spawn(game_closure)
 }

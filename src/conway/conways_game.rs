@@ -1,40 +1,18 @@
 use rand::prelude::*;
 use rand_chacha;
-use std::fmt::Display;
-use std::str::FromStr;
 use std::sync::mpsc::Receiver;
+use std::thread::{spawn, JoinHandle};
 use std::time::SystemTime;
 use std::{i64, time::Duration, usize};
 use std::{thread, u64};
 
 use crate::console::console_control::ConsoleCommand;
-use crate::conways_law::conways_law;
-use crate::coordinate::Coord;
+use crate::conway::command::Command;
+use crate::conway::conways_law;
 use crate::terminal_formatter;
 
-#[derive(PartialEq, Clone, Copy)]
-pub enum PrintMode {
-    PRETTY,
-    DEBUG,
-}
-impl Display for PrintMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            PrintMode::DEBUG => write!(f, "Debug"),
-            PrintMode::PRETTY => write!(f, "Pretty"),
-        }
-    }
-}
-impl FromStr for PrintMode {
-    type Err = String;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "pretty" | "PRETTY" => Ok(PrintMode::PRETTY),
-            "debug" | "DEBUG" => Ok(PrintMode::DEBUG),
-            _ => Err(format!("`{}` is not a valid mode", s)),
-        }
-    }
-}
+use super::print_mode::PrintMode;
+use super::settings::ConwaysSettings;
 
 pub struct ConwaysGame {
     current: Vec<Vec<bool>>,
@@ -44,49 +22,12 @@ pub struct ConwaysGame {
     out: terminal_formatter::Terminal,
     receiver: Receiver<ConsoleCommand>,
 }
-struct ConwaysSettings {
-    x_len: usize,
-    y_len: usize,
-    cell_view_width: u16,
-    cell_view_height: u16,
-    origin: Coord,
-}
-
-#[derive(PartialEq)]
-enum COMMAND {
-    QUIT,
-    PAUSEPLAY,
-    TOGGLEMODE,
-    TOGGLEFPS,
-    MOVELEFT,
-    MOVERIGHT,
-    MOVEUP,
-    MOVEDOWN,
-    NOMAPPING,
-    NONE,
-}
-impl Display for COMMAND {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            COMMAND::QUIT => write!(f, "Quit"),
-            COMMAND::PAUSEPLAY => write!(f, "Toggle pause"),
-            COMMAND::TOGGLEMODE => write!(f, "Toggle print mode"),
-            COMMAND::TOGGLEFPS => write!(f, "Toggle fps"),
-            COMMAND::MOVELEFT => write!(f, "Move the board left"),
-            COMMAND::MOVERIGHT => write!(f, "Move the board right"),
-            COMMAND::MOVEUP => write!(f, "Move the board up"),
-            COMMAND::MOVEDOWN => write!(f, "Move the board down"),
-            COMMAND::NOMAPPING => write!(f, "Key not mapped"),
-            COMMAND::NONE => write!(f, "NONE"),
-        }
-    }
-}
 
 struct ConwaysState {
     fps_last: u64,    //lol
     fps_current: u64, //lol
     latest_input: char,
-    latest_command: COMMAND,
+    latest_command: Command,
     command_count: u64,
     latest_err: String,
     is_paused: bool,
@@ -118,6 +59,7 @@ impl ConwaysGame {
         y_len: usize,
         seed: u64,
         mode: PrintMode,
+        duration: Duration,
         receiver: Receiver<ConsoleCommand>,
     ) -> Self {
         assert!(x_len > 0);
@@ -137,7 +79,7 @@ impl ConwaysGame {
             out: terminal_formatter::Terminal::init(),
             state: ConwaysState {
                 print_mode: mode,
-                latest_command: COMMAND::NONE,
+                latest_command: Command::NONE,
                 command_count: 0,
                 latest_input: ' ',
                 rounds: 0,
@@ -148,14 +90,28 @@ impl ConwaysGame {
                 latest_err: "".to_string(),
             },
             receiver,
-            settings: ConwaysSettings {
+            settings: ConwaysSettings::init(x_len, y_len, duration),
+        }
+    }
+    pub fn run_async(
+        x_len: usize,
+        y_len: usize,
+        seed: u64,
+        print_mode: PrintMode,
+        receiver: Receiver<ConsoleCommand>,
+    ) -> JoinHandle<()> {
+        let game_closure = move || {
+            let mut gs = ConwaysGame::init(
                 x_len,
                 y_len,
-                cell_view_width: 3,
-                cell_view_height: 2,
-                origin: Coord { x: 0, y: 0 },
-            },
-        }
+                seed,
+                print_mode,
+                Duration::from_millis(1000),
+                receiver,
+            );
+            gs.run();
+        };
+        spawn(game_closure)
     }
 
     /// Run the game with the specified time between next calls
@@ -171,7 +127,7 @@ impl ConwaysGame {
     /// let dur = Duration::from_millis(1000);
     /// game.run(dur);
     /// ```
-    pub fn run(&mut self, duration: Duration) {
+    pub fn run(&mut self) {
         {
             self.out.lock();
             self.out.clear();
@@ -186,7 +142,7 @@ impl ConwaysGame {
                 Ok(cmd) => self.process_command(cmd),
                 Err(_) => (),
             };
-            if self.state.latest_command == COMMAND::QUIT {
+            if self.state.latest_command == Command::QUIT {
                 break;
             }
             match now.elapsed() {
@@ -200,7 +156,9 @@ impl ConwaysGame {
                     }
                     self.state.fps_current += 1;
 
-                    if !self.state.is_paused && elapsed - elapsed_prev_game > duration {
+                    if !self.state.is_paused
+                        && elapsed - elapsed_prev_game > self.settings.round_duration
+                    {
                         self.next();
                         self.state.rounds += 1;
                         elapsed_prev_game = elapsed.clone();
@@ -248,7 +206,7 @@ impl ConwaysGame {
         self.state.command_count += 1;
         self.state.latest_input = command.command;
         self.state.latest_command = match command.command {
-            'q' | 'Q' => COMMAND::QUIT,
+            'q' | 'Q' => Command::QUIT,
             'm' | 'M' => {
                 self.state.print_mode = match self.state.print_mode {
                     PrintMode::DEBUG => {
@@ -262,15 +220,15 @@ impl ConwaysGame {
                         PrintMode::DEBUG
                     }
                 };
-                COMMAND::TOGGLEMODE
+                Command::TOGGLEMODE
             }
             ' ' => {
                 self.state.is_paused = !self.state.is_paused;
-                COMMAND::PAUSEPLAY
+                Command::PAUSEPLAY
             }
             'f' | 'F' => {
                 self.state.is_fps_limited = !self.state.is_fps_limited;
-                COMMAND::TOGGLEFPS
+                Command::TOGGLEFPS
             }
             'w' | 'W' => {
                 self.out.clear();
@@ -278,7 +236,7 @@ impl ConwaysGame {
                 if self.settings.origin.y > 0 {
                     self.settings.origin.y -= 1;
                 }
-                COMMAND::MOVEUP
+                Command::MOVEUP
             }
             'a' | 'A' => {
                 self.out.clear();
@@ -286,21 +244,21 @@ impl ConwaysGame {
                 if self.settings.origin.x > 0 {
                     self.settings.origin.x -= 1;
                 }
-                COMMAND::MOVELEFT
+                Command::MOVELEFT
             }
             's' | 'S' => {
                 self.out.clear();
                 self.out.hide_cursor();
                 self.settings.origin.y += 1;
-                COMMAND::MOVEDOWN
+                Command::MOVEDOWN
             }
             'd' | 'D' => {
                 self.out.clear();
                 self.out.hide_cursor();
                 self.settings.origin.x += 1;
-                COMMAND::MOVERIGHT
+                Command::MOVERIGHT
             }
-            _ => COMMAND::NOMAPPING,
+            _ => Command::NOMAPPING,
         }
     }
 
@@ -498,7 +456,7 @@ impl ConwaysGame {
         for y in 0..self.settings.y_len {
             for x in 0..self.settings.x_len {
                 let live_siblings = self.count_siblings(x, y);
-                new_state[y][x] = conways_law(self.current[y][x], live_siblings);
+                new_state[y][x] = conways_law::conways_law(self.current[y][x], live_siblings);
             }
             assert_eq!(
                 self.settings.x_len,
@@ -559,14 +517,21 @@ impl ConwaysGame {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::mpsc;
+    use std::{sync::mpsc, time::Duration};
 
     use super::ConwaysGame;
 
     #[test]
     fn init_works() {
         let (_sen, rec) = mpsc::channel();
-        let game = ConwaysGame::init(5, 5, 55, super::PrintMode::DEBUG, rec);
+        let game = ConwaysGame::init(
+            5,
+            5,
+            55,
+            super::PrintMode::DEBUG,
+            Duration::from_secs(1),
+            rec,
+        );
 
         let current_state = game.current.clone();
 
@@ -609,7 +574,14 @@ mod tests {
     #[test]
     fn next() {
         let (_sen, rec) = mpsc::channel();
-        let mut game = ConwaysGame::init(5, 5, 55, super::PrintMode::DEBUG, rec);
+        let mut game = ConwaysGame::init(
+            5,
+            5,
+            55,
+            super::PrintMode::DEBUG,
+            Duration::from_secs(1),
+            rec,
+        );
         game.next();
 
         let scenarios = [
@@ -652,7 +624,14 @@ mod tests {
     #[test]
     fn siblings_count() {
         let (_sen, rec) = mpsc::channel();
-        let mut game = ConwaysGame::init(5, 5, 55, super::PrintMode::DEBUG, rec);
+        let mut game = ConwaysGame::init(
+            5,
+            5,
+            55,
+            super::PrintMode::DEBUG,
+            Duration::from_secs(1),
+            rec,
+        );
 
         let scenarios = [
             (0, 0, 6),

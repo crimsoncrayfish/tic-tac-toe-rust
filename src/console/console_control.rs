@@ -1,5 +1,4 @@
 use std::char;
-use std::fmt::Display;
 use windows_sys::Win32::Foundation::{HANDLE, INVALID_HANDLE_VALUE};
 use windows_sys::Win32::System::Console::{
     GetConsoleMode, GetStdHandle, ReadConsoleInputA, SetConsoleMode, CONSOLE_MODE,
@@ -7,19 +6,8 @@ use windows_sys::Win32::System::Console::{
     KEY_EVENT_RECORD, KEY_EVENT_RECORD_0, STD_INPUT_HANDLE,
 };
 
-#[derive(Debug)]
-pub enum ConsoleControlErr {
-    NoHandle,
-    NoModeResponse,
-    ModeTypeUnknown,
-    SetModeFailed,
-    NoInputRead,
-}
-impl Display for ConsoleControlErr {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "failed...")
-    }
-}
+use super::errors::ConsoleControlErr;
+use super::mode::ConsoleMode;
 
 pub struct ConsoleControl {
     handle: HANDLE,
@@ -119,24 +107,6 @@ impl ConsoleControl {
             return Err(ConsoleControlErr::NoModeResponse);
         }
         return Ok(());
-    }
-}
-
-pub enum ConsoleMode {
-    Cooked,
-    UncookedPartial,
-    Uncooked,
-    None,
-}
-
-impl Display for ConsoleMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ConsoleMode::Uncooked => write!(f, "Uncooked"),
-            ConsoleMode::UncookedPartial => write!(f, "Partially Uncooked"),
-            ConsoleMode::Cooked => write!(f, "Cooked"),
-            ConsoleMode::None => write!(f, "NOT FOUND"),
-        }
     }
 }
 
