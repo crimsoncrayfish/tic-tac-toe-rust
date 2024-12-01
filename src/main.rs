@@ -1,9 +1,9 @@
 use std::{
     env,
-    str::FromStr,
     sync::mpsc::{self},
 };
 
+use arg_helper::read_config;
 use console::errors::ConsoleControlErr;
 use console::notify_inputs;
 use conway::{conways_game, print_mode::PrintMode};
@@ -21,7 +21,7 @@ pub mod conway {
     pub mod print_mode;
     pub mod settings;
 }
-
+pub mod arg_helper;
 pub mod coordinate;
 pub mod terminal_formatter;
 
@@ -40,25 +40,4 @@ fn main() -> Result<(), ConsoleControlErr> {
         .unwrap();
 
     return Ok(());
-}
-
-#[allow(dead_code)]
-fn read_config<T>(args: &Vec<String>, arg: String, default: T) -> T
-where
-    T: FromStr + Clone + Copy,
-{
-    let mut out: T = default.clone();
-    for i in 1..args.len() {
-        if args[i].as_str() != arg {
-            continue;
-        }
-        if let Some(val) = args.get(i + 1) {
-            out = val.parse().unwrap_or_else(|_| {
-                eprint!("invalid value for {}. Using default.", arg);
-                default
-            });
-        }
-    }
-
-    out
 }
