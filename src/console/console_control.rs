@@ -1,18 +1,31 @@
 use std::char;
 use windows_sys::Win32::Foundation::{HANDLE, INVALID_HANDLE_VALUE};
 use windows_sys::Win32::System::Console::{
-    GetConsoleMode, GetStdHandle, ReadConsoleInputA, SetConsoleMode, CONSOLE_MODE,
-    ENABLE_ECHO_INPUT, ENABLE_LINE_INPUT, ENABLE_PROCESSED_INPUT, INPUT_RECORD, INPUT_RECORD_0,
-    KEY_EVENT_RECORD, KEY_EVENT_RECORD_0, STD_INPUT_HANDLE,
+    GetConsoleMode, GetStdHandle, ReadConsoleInputA, SetConsoleMode, CONSOLE_MODE, INPUT_RECORD,
+    INPUT_RECORD_0, KEY_EVENT_RECORD, KEY_EVENT_RECORD_0, STD_INPUT_HANDLE,
 };
 
 use super::errors::ConsoleControlErr;
-use super::mode::ConsoleMode;
+use super::mode::{self, ConsoleMode};
 
 pub struct ConsoleControl {
     handle: HANDLE,
 }
 impl ConsoleControl {
+    ///Initialize an instance of ConsoleControl
+    ///
+    /// #Returns
+    ///
+    /// An a Result that is either an instance of ConsoleControl or an error
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let control= match ConsoleControl::init() {
+    ///     Ok(control) => control,
+    ///     Err(e) => return e,
+    /// };
+    /// ```
     pub fn init() -> Result<Self, ConsoleControlErr> {
         let input_handle: HANDLE = unsafe { GetStdHandle(STD_INPUT_HANDLE) };
         if input_handle == INVALID_HANDLE_VALUE {
@@ -23,33 +36,47 @@ impl ConsoleControl {
         })
     }
 
+    /// Get current console mode
+    ///
+    /// #Returns
+    ///
+    /// An a Result that is either an enum value representing the current mode
+    /// of the console or an error
+    ///
+    /// Modes:
+    /// Cooked - Normel mode
+    /// Uncooked - All events need to be processed manually
+    ///
+    /// See 'set_uncooked_mode' for how to change mode
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mode = match control.get_console_mode() {
+    ///     Ok(mode) => mode,
+    ///     Err(e) => return e,
+    /// };
+    /// ```
     pub fn get_console_mode(&mut self) -> Result<ConsoleMode, ConsoleControlErr> {
         let mode: CONSOLE_MODE = self.get_console_mode_raw()?;
-        match mode {
-            x if ((x & ENABLE_ECHO_INPUT) != 0
-                && (x & ENABLE_PROCESSED_INPUT) != 0
-                && (x & ENABLE_LINE_INPUT) != 0) =>
-            {
-                Ok(ConsoleMode::Cooked)
-            }
-            x if ((x & ENABLE_ECHO_INPUT) == 0
-                && (x & ENABLE_PROCESSED_INPUT) == 0
-                && (x & ENABLE_LINE_INPUT) == 0) =>
-            {
-                Ok(ConsoleMode::Uncooked)
-            }
-            x if ((x & ENABLE_ECHO_INPUT) == 0
-                || (x & ENABLE_PROCESSED_INPUT) == 0
-                || (x & ENABLE_LINE_INPUT) == 0) =>
-            {
-                Ok(ConsoleMode::UncookedPartial)
-            }
-            _ => {
-                return Err(ConsoleControlErr::ModeTypeUnknown);
-            }
-        }
+        mode::ConsoleMode::match_mode(mode)
     }
 
+    /// Get current console mode
+    ///
+    /// #Returns
+    ///
+    /// An a Result that is either an enum value representing the current mode
+    /// of the console or an error
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mode = match self.get_console_mode() {
+    ///     Ok(mode) => mode,
+    ///     Err(e) => return e,
+    /// };
+    /// ```
     fn get_console_mode_raw(&self) -> Result<CONSOLE_MODE, ConsoleControlErr> {
         let mut mode: CONSOLE_MODE = 0;
         let success = unsafe { GetConsoleMode(self.handle, &mut mode) };
@@ -59,6 +86,21 @@ impl ConsoleControl {
         Ok(mode)
     }
 
+    /// Read input from console (requires uncooked mode - see
+    ///
+    /// #Returns
+    ///
+    /// An a Result that is either an enum value representing the current mode
+    /// of the console or an error
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mode = match self.get_console_mode() {
+    ///     Ok(mode) => mode,
+    ///     Err(e) => return e,
+    /// };
+    /// ```
     pub fn read_console_input(&self) -> Result<ConsoleCommand, ConsoleControlErr> {
         let input_rec: INPUT_RECORD = self.read_console_input_raw()?;
 
@@ -83,24 +125,8 @@ impl ConsoleControl {
         Ok(input_rec)
     }
 
-    pub fn set_uncooked_mode(&self) -> Result<(), ConsoleControlErr> {
-        let mut mode = self.get_console_mode_raw()?;
-        mode &= !ENABLE_ECHO_INPUT;
-        mode &= !ENABLE_LINE_INPUT;
-        mode &= !ENABLE_PROCESSED_INPUT;
-
-        let success = unsafe { SetConsoleMode(self.handle, mode) };
-        if success == 0 {
-            return Err(ConsoleControlErr::NoModeResponse);
-        }
-        return Ok(());
-    }
-
-    pub fn set_cooked_mode(&self) -> Result<(), ConsoleControlErr> {
-        let mut mode = self.get_console_mode_raw()?;
-        mode |= ENABLE_ECHO_INPUT;
-        mode |= ENABLE_LINE_INPUT;
-        mode |= ENABLE_PROCESSED_INPUT;
+    pub fn set_mode(&self, mode: ConsoleMode) -> Result<(), ConsoleControlErr> {
+        let mode = ConsoleMode::update_mode(self.get_console_mode_raw()?, mode);
 
         let success = unsafe { SetConsoleMode(self.handle, mode) };
         if success == 0 {

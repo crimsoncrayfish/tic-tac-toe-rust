@@ -6,6 +6,7 @@ use std::{
 use super::{
     console_control::{ConsoleCommand, ConsoleControl},
     errors::ConsoleControlErr,
+    mode::ConsoleMode,
 };
 
 pub fn listen_and_notify_inputs(
@@ -14,7 +15,7 @@ pub fn listen_and_notify_inputs(
     let read_input_closure = move || -> Result<(), ConsoleControlErr> {
         // TODO: Handle this err
         let cm = ConsoleControl::init()?;
-        match cm.set_uncooked_mode() {
+        match cm.set_mode(ConsoleMode::Uncooked) {
             Ok(_) => (),
             Err(e) => return Err(e),
         }
@@ -38,7 +39,7 @@ pub fn listen_and_notify_inputs(
             }
         }
 
-        match cm.set_cooked_mode() {
+        match cm.set_mode(ConsoleMode::Cooked) {
             Ok(_) => (),
             Err(e) => return Err(e),
         }
