@@ -51,7 +51,20 @@ impl Terminal {
     // terminal_formatter.clear();
     // ```
     pub fn clear(&mut self) {
-        let _ = write!(self.buffer, "\x1Bc");
+        self.reset_colors();
+        let _ = write!(self.buffer, "\x1B[2J");
+        self.reset_colors();
+    }
+    // Clears the current line
+    //
+    // # Example
+    // ```
+    // terminal_formatter.clear_line();
+    // ```
+    pub fn clear_line(&mut self) {
+        self.reset_colors();
+        let _ = write!(self.buffer, "\x1B[2K");
+        self.reset_colors();
     }
     // Hide the cursor
     //

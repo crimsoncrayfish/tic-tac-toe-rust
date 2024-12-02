@@ -6,7 +6,7 @@ use std::time::SystemTime;
 use std::{i64, time::Duration, usize};
 use std::{thread, u64};
 
-use crate::console::console_control::ConsoleCommand;
+use crate::console::input_record::KeyEvent;
 use crate::conway::command::Command;
 use crate::conway::conways_law;
 use crate::terminal_formatter;
@@ -20,7 +20,7 @@ pub struct ConwaysGame {
     state: ConwaysState,
     settings: ConwaysSettings,
     out: terminal_formatter::Terminal,
-    receiver: Receiver<ConsoleCommand>,
+    receiver: Receiver<KeyEvent>,
 }
 
 struct ConwaysState {
@@ -60,7 +60,7 @@ impl ConwaysGame {
         seed: u64,
         mode: PrintMode,
         duration: Duration,
-        receiver: Receiver<ConsoleCommand>,
+        receiver: Receiver<KeyEvent>,
     ) -> Self {
         assert!(x_len > 0);
         assert!(y_len > 0);
@@ -98,7 +98,7 @@ impl ConwaysGame {
         y_len: usize,
         seed: u64,
         print_mode: PrintMode,
-        receiver: Receiver<ConsoleCommand>,
+        receiver: Receiver<KeyEvent>,
     ) -> JoinHandle<()> {
         let game_closure = move || {
             let mut gs = ConwaysGame::init(
@@ -139,7 +139,7 @@ impl ConwaysGame {
 
         loop {
             match self.receiver.try_recv() {
-                Ok(cmd) => self.process_command(cmd),
+                Ok(cmd) => self.process_key_command(cmd),
                 Err(_) => (),
             };
             if self.state.latest_command == Command::QUIT {
@@ -199,7 +199,7 @@ impl ConwaysGame {
     /// self.process_command();
     ///
     /// ```
-    fn process_command(&mut self, command: ConsoleCommand) {
+    fn process_key_command(&mut self, command: KeyEvent) {
         if !command.is_down {
             return;
         }
@@ -231,31 +231,27 @@ impl ConwaysGame {
                 Command::TOGGLEFPS
             }
             'w' | 'W' => {
-                self.out.clear();
-                self.out.hide_cursor();
                 if self.settings.origin.y > 0 {
                     self.settings.origin.y -= 1;
+                    self.clear_cells();
                 }
                 Command::MOVEUP
             }
             'a' | 'A' => {
-                self.out.clear();
-                self.out.hide_cursor();
                 if self.settings.origin.x > 0 {
                     self.settings.origin.x -= 1;
+                    self.clear_cells();
                 }
                 Command::MOVELEFT
             }
             's' | 'S' => {
-                self.out.clear();
-                self.out.hide_cursor();
                 self.settings.origin.y += 1;
+                self.clear_cells();
                 Command::MOVEDOWN
             }
             'd' | 'D' => {
-                self.out.clear();
-                self.out.hide_cursor();
                 self.settings.origin.x += 1;
+                self.clear_cells();
                 Command::MOVERIGHT
             }
             _ => Command::NOMAPPING,
@@ -512,6 +508,31 @@ impl ConwaysGame {
             }
         }
         sibling_count
+    }
+    // Clear the screen manually
+    // TODO: this is a temporary fix so i dont have to call clear so often
+    //
+    // ### Usage
+    //
+    // ```
+    // self.clear_cells();
+    // ```
+    fn clear_cells(&mut self) {
+        let total_height = (self.settings.y_len as u16 * self.settings.cell_view_height)
+            + 1
+            + self.settings.y_len as u16
+            + self.settings.origin.y;
+        for y_loc in 0..total_height {
+            self.out.set_cursor_location(0, y_loc);
+            self.out.clear_line();
+        }
+        if self.state.print_mode == PrintMode::DEBUG {
+            //TODO: this hardcoded 6 is painfull to see
+            for y_loc in total_height + 1..total_height + 7 {
+                self.out.set_cursor_location(0, y_loc);
+                self.out.clear_line();
+            }
+        }
     }
 }
 

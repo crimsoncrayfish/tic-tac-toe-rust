@@ -7,6 +7,7 @@ pub enum ConsoleControlErr {
     ModeTypeUnknown,
     SetModeFailed,
     NoInputRead,
+    WrongEventType,
 }
 impl Display for ConsoleControlErr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

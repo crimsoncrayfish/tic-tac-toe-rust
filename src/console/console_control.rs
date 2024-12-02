@@ -1,11 +1,11 @@
-use std::char;
 use windows_sys::Win32::Foundation::{HANDLE, INVALID_HANDLE_VALUE};
 use windows_sys::Win32::System::Console::{
     GetConsoleMode, GetStdHandle, ReadConsoleInputA, SetConsoleMode, CONSOLE_MODE, INPUT_RECORD,
-    INPUT_RECORD_0, KEY_EVENT_RECORD, KEY_EVENT_RECORD_0, STD_INPUT_HANDLE,
+    STD_INPUT_HANDLE,
 };
 
 use super::errors::ConsoleControlErr;
+use super::input_record::{EventType, InputRecord, KeyEvent};
 use super::mode::{self, ConsoleMode};
 
 pub struct ConsoleControl {
@@ -23,7 +23,7 @@ impl ConsoleControl {
     /// ```
     /// let control= match ConsoleControl::init() {
     ///     Ok(control) => control,
-    ///     Err(e) => return e,
+    ///     Err(e) => return Err(e),
     /// };
     /// ```
     pub fn init() -> Result<Self, ConsoleControlErr> {
@@ -54,7 +54,7 @@ impl ConsoleControl {
     /// ```
     /// let mode = match control.get_console_mode() {
     ///     Ok(mode) => mode,
-    ///     Err(e) => return e,
+    ///     Err(e) => return Err(e),
     /// };
     /// ```
     pub fn get_console_mode(&mut self) -> Result<ConsoleMode, ConsoleControlErr> {
@@ -62,19 +62,18 @@ impl ConsoleControl {
         mode::ConsoleMode::match_mode(mode)
     }
 
-    /// Get current console mode
+    /// Get current console mode working directly with the windows APIs
     ///
     /// #Returns
     ///
-    /// An a Result that is either an enum value representing the current mode
-    /// of the console or an error
+    /// An a Result that is either an instance of CONSOLE_MODE an error
     ///
     /// # Examples
     ///
     /// ```
-    /// let mode = match self.get_console_mode() {
+    /// let mode = match self.get_console_mode_raw() {
     ///     Ok(mode) => mode,
-    ///     Err(e) => return e,
+    ///     Err(e) => return Err(e),
     /// };
     /// ```
     fn get_console_mode_raw(&self) -> Result<CONSOLE_MODE, ConsoleControlErr> {
@@ -90,33 +89,46 @@ impl ConsoleControl {
     ///
     /// #Returns
     ///
-    /// An a Result that is either an enum value representing the current mode
-    /// of the console or an error
+    /// An a Result that is either an instance of ConsoleCommand (a wrapper for INPUT_RECORD)
+    /// or an error
     ///
     /// # Examples
     ///
     /// ```
-    /// let mode = match self.get_console_mode() {
-    ///     Ok(mode) => mode,
-    ///     Err(e) => return e,
+    /// let input= match self.read_console_input() {
+    ///     Ok(i) => i,
+    ///     Err(e) => return Err(e),
     /// };
     /// ```
-    pub fn read_console_input(&self) -> Result<ConsoleCommand, ConsoleControlErr> {
-        let input_rec: INPUT_RECORD = self.read_console_input_raw()?;
+    pub fn read_console_input(&self) -> Result<KeyEvent, ConsoleControlErr> {
+        // TODO: handle these errors
+        let input_rec_raw = self.read_console_input_raw()?;
+        let input_rec: InputRecord = InputRecord::from_raw(input_rec_raw)?;
 
-        //todo: figure our this union thing
-        let cmd = ConsoleCommand {
-            command: char::from_u32(unsafe { input_rec.Event.KeyEvent.uChar.UnicodeChar as u32 })
-                .unwrap(),
-            repreat_count: unsafe { input_rec.Event.KeyEvent.wRepeatCount },
-            is_down: unsafe { input_rec.Event.KeyEvent.bKeyDown } == 1,
-        };
-        Ok(cmd)
+        match input_rec.event_type {
+            EventType::KeyEvent => Ok(unsafe { input_rec.event.key_event }),
+            _ => Err(ConsoleControlErr::WrongEventType),
+        }
     }
 
+    /// Read the console raw inputs working directly with the windows APIs
+    /// This function waits for the next input.
+    ///
+    /// #Returns
+    ///
+    /// An a Result that is either an instance of INPUT_RECORD or an error
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mode = match self.read_console_input_raw() {
+    ///     Ok(mode) => mode,
+    ///     Err(e) => return Err(e),
+    /// };
+    /// ```
     fn read_console_input_raw(&self) -> Result<INPUT_RECORD, ConsoleControlErr> {
         let mut event_count: u32 = 0;
-        let mut input_rec: INPUT_RECORD = new_input_rec();
+        let mut input_rec: INPUT_RECORD = InputRecord::new_raw();
         let success =
             unsafe { ReadConsoleInputA(self.handle, &mut input_rec, 1, &mut event_count) };
         if success == 0 {
@@ -134,29 +146,4 @@ impl ConsoleControl {
         }
         return Ok(());
     }
-}
-
-fn new_input_rec() -> INPUT_RECORD {
-    let key_event_rec = KEY_EVENT_RECORD_0 { UnicodeChar: 0 };
-    let key_event = KEY_EVENT_RECORD {
-        bKeyDown: 0,
-        wRepeatCount: 0,
-        wVirtualKeyCode: 0,
-        wVirtualScanCode: 0,
-        uChar: key_event_rec,
-        dwControlKeyState: 0,
-    };
-    let event = INPUT_RECORD_0 {
-        KeyEvent: key_event,
-    };
-    INPUT_RECORD {
-        EventType: 0,
-        Event: event,
-    }
-}
-#[derive(Clone)]
-pub struct ConsoleCommand {
-    pub command: char,
-    pub repreat_count: u16,
-    pub is_down: bool,
 }

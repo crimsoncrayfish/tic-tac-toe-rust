@@ -11,6 +11,7 @@ use conway::{conways_game, print_mode::PrintMode};
 pub mod console {
     pub mod console_control;
     pub mod errors;
+    pub mod input_record;
     pub mod mode;
     pub mod notify_inputs;
 }
@@ -27,7 +28,7 @@ pub mod terminal_formatter;
 
 fn main() -> Result<(), ConsoleControlErr> {
     let (transmitter, receiver) = mpsc::channel();
-    let _handle = notify_inputs::listen_and_notify_inputs(transmitter);
+    let _handle = notify_inputs::listen_and_notify_key_inputs(transmitter);
 
     let args: Vec<String> = env::args().collect();
 
