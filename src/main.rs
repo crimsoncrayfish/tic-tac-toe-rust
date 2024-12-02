@@ -25,6 +25,7 @@ pub mod conway {
 pub mod arg_helper;
 pub mod coordinate;
 pub mod terminal_formatter;
+pub mod terminal_message_helper;
 
 fn main() -> Result<(), ConsoleControlErr> {
     let (transmitter, receiver) = mpsc::channel();

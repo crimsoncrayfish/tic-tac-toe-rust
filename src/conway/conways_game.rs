@@ -9,6 +9,7 @@ use std::{thread, u64};
 use crate::console::input_record::KeyEvent;
 use crate::conway::command::Command;
 use crate::conway::conways_law;
+use crate::coordinate::Coord;
 use crate::terminal_formatter;
 
 use super::print_mode::PrintMode;
@@ -34,6 +35,7 @@ struct ConwaysState {
     is_fps_limited: bool,
     rounds: u64,
     print_mode: PrintMode,
+    is_reset_active: bool,
 }
 
 impl ConwaysGame {
@@ -87,10 +89,11 @@ impl ConwaysGame {
                 fps_current: 0,
                 is_paused: false,
                 is_fps_limited: false,
+                is_reset_active: false,
                 latest_err: "".to_string(),
             },
             receiver,
-            settings: ConwaysSettings::init(x_len, y_len, duration),
+            settings: ConwaysSettings::init(x_len, y_len, duration, seed),
         }
     }
     pub fn run_async(
@@ -112,6 +115,32 @@ impl ConwaysGame {
             gs.run();
         };
         spawn(game_closure)
+    }
+
+    fn reset(&mut self) {
+        let mut _rng = rand_chacha::ChaCha8Rng::seed_from_u64(self.settings.seed);
+        let mut new_state = vec![vec![false; self.settings.x_len]; self.settings.y_len];
+        let new_prev = new_state.clone();
+        for y in 0..self.settings.y_len {
+            for x in 0..self.settings.x_len {
+                new_state[y][x] = _rng.gen();
+            }
+        }
+        self.current = new_state;
+        self.previous = new_prev;
+        self.state = ConwaysState {
+            print_mode: self.state.print_mode,
+            latest_command: Command::NONE,
+            command_count: 0,
+            latest_input: ' ',
+            rounds: 0,
+            fps_last: 0,
+            fps_current: 0,
+            is_paused: false,
+            is_fps_limited: false,
+            is_reset_active: false,
+            latest_err: "".to_string(),
+        };
     }
 
     /// Run the game with the specified time between next calls
@@ -175,6 +204,9 @@ impl ConwaysGame {
             if self.is_stable() {
                 break;
             }
+            if self.state.is_reset_active {
+                self.reset();
+            }
         }
         self.out.lock();
         self.out.show_cursor();
@@ -207,6 +239,10 @@ impl ConwaysGame {
         self.state.latest_input = command.command;
         self.state.latest_command = match command.command {
             'q' | 'Q' => Command::QUIT,
+            'r' | 'R' => {
+                self.state.is_reset_active = true;
+                Command::RESET
+            }
             'm' | 'M' => {
                 self.state.print_mode = match self.state.print_mode {
                     PrintMode::DEBUG => {
@@ -314,7 +350,8 @@ impl ConwaysGame {
             .writeln(format!("Is Paused: {}", self.state.is_paused));
         self.out
             .writeln(format!("FPS Count: {}", self.state.fps_last));
-
+        let center = self.find_center();
+        self.out.writeln(format!("Center: {}", center));
         if self.state.latest_err != "" {
             self.out
                 .set_background(terminal_formatter::TerminalColors::Red);
@@ -528,11 +565,46 @@ impl ConwaysGame {
         }
         if self.state.print_mode == PrintMode::DEBUG {
             //TODO: this hardcoded 6 is painfull to see
-            for y_loc in total_height + 1..total_height + 7 {
+            for y_loc in total_height + 1..total_height + 8 {
                 self.out.set_cursor_location(0, y_loc);
                 self.out.clear_line();
             }
         }
+    }
+    // Find the opposite corners of the board
+    //
+    // ### Usage
+    //
+    // ```
+    // self.find_corners();
+    // ```
+    fn find_corners(&mut self) -> [Coord; 2] {
+        let top = self.settings.origin.y;
+        let bottom = (self.settings.y_len as u16 * self.settings.cell_view_height)
+            + 1
+            + self.settings.y_len as u16
+            + top;
+
+        let left = self.settings.origin.x;
+        let right = (self.settings.x_len as u16 * self.settings.cell_view_width)
+            + 1
+            + self.settings.x_len as u16
+            + left;
+        [Coord { x: left, y: bottom }, Coord { x: right, y: top }]
+    }
+    // Find the center of the  board
+    //
+    // ### Usage
+    //
+    // ```
+    // self.find_center();
+    // ```
+    fn find_center(&mut self) -> Coord {
+        let corners = self.find_corners();
+        let x = ((corners[0].x + corners[1].x) as f32 / 2.0).floor() as u16;
+        let y = ((corners[0].y + corners[1].y) as f32 / 2.0).floor() as u16;
+
+        Coord { x, y }
     }
 }
 

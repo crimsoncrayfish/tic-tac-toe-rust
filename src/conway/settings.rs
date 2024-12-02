@@ -8,9 +8,10 @@ pub struct ConwaysSettings {
     pub cell_view_height: u16,
     pub round_duration: Duration,
     pub origin: Coord,
+    pub seed: u64,
 }
 impl ConwaysSettings {
-    pub fn init(x_len: usize, y_len: usize, duration: Duration) -> Self {
+    pub fn init(x_len: usize, y_len: usize, duration: Duration, seed: u64) -> Self {
         ConwaysSettings {
             x_len,
             y_len,
@@ -18,6 +19,7 @@ impl ConwaysSettings {
             cell_view_height: 2,
             round_duration: duration,
             origin: Coord { x: 0, y: 0 },
+            seed,
         }
     }
 }

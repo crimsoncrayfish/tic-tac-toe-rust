@@ -2,6 +2,7 @@ use core::fmt::Display;
 #[derive(PartialEq)]
 pub enum Command {
     QUIT,
+    RESET,
     PAUSEPLAY,
     TOGGLEMODE,
     TOGGLEFPS,
@@ -16,6 +17,7 @@ impl Display for Command {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Command::QUIT => write!(f, "Quit"),
+            Command::RESET => write!(f, "Reset"),
             Command::PAUSEPLAY => write!(f, "Toggle pause"),
             Command::TOGGLEMODE => write!(f, "Toggle print mode"),
             Command::TOGGLEFPS => write!(f, "Toggle fps"),
