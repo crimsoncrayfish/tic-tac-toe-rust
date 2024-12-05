@@ -1,6 +1,8 @@
 use std::{
     env,
     sync::mpsc::{self},
+    thread::sleep,
+    time::Duration,
 };
 
 use arg_helper::read_config;
@@ -24,10 +26,14 @@ pub mod conway {
 }
 pub mod arg_helper;
 pub mod coordinate;
-pub mod terminal_formatter;
-pub mod terminal_message_helper;
+pub mod terminal {
+    pub mod formatter;
+    pub mod message_helper;
+    pub mod shared_writer;
+}
 
 fn main() -> Result<(), ConsoleControlErr> {
+    sleep(Duration::from_secs(3));
     let (transmitter, receiver) = mpsc::channel();
     let _handle = notify_inputs::listen_and_notify_key_inputs(transmitter);
 

@@ -1,7 +1,9 @@
-use std::io::{Stdout, Write};
+use std::io::Write;
+
+use super::shared_writer::SharedWriter;
 
 pub struct Terminal {
-    pub buffer: Stdout,
+    pub writer: SharedWriter,
 }
 
 pub enum TerminalColors {
@@ -19,29 +21,17 @@ impl Terminal {
     // ```
     // let term = terminal_formatter::init();
     // ```
-    pub fn init() -> Self {
-        Terminal {
-            buffer: std::io::stdout(),
-        }
+    pub fn init(w: SharedWriter) -> Self {
+        Terminal { writer: w }
     }
     pub fn write(&mut self, val: String) {
-        let _ = write!(self.buffer, "{}", val);
+        self.writer.write(format_args!("{}", val));
     }
     pub fn writeln(&mut self, val: String) {
-        let _ = writeln!(self.buffer, "\x1b[2K{}", val);
+        self.writer.write(format_args!("\x1b[2K{}", val));
     }
     pub fn flush(&mut self) {
-        let _ = self.buffer.flush();
-    }
-
-    // Lock the output
-    //
-    // # Example
-    // ```
-    // terminal_formatter.lock();
-    // ```
-    pub fn lock(&mut self) {
-        let _ = self.buffer.lock();
+        self.writer.flush();
     }
 
     // Clear the terminal
@@ -52,7 +42,7 @@ impl Terminal {
     // ```
     pub fn clear(&mut self) {
         self.reset_colors();
-        let _ = write!(self.buffer, "\x1B[2J");
+        self.write("\x1B[2J".to_string());
         self.reset_colors();
     }
     // Clears the current line
@@ -63,7 +53,7 @@ impl Terminal {
     // ```
     pub fn clear_line(&mut self) {
         self.reset_colors();
-        let _ = write!(self.buffer, "\x1B[2K");
+        self.write("\x1B[2K".to_string());
         self.reset_colors();
     }
     // Hide the cursor
@@ -73,7 +63,7 @@ impl Terminal {
     // terminal_formatter.hide_cursor();
     // ```
     pub fn hide_cursor(&mut self) {
-        let _ = write!(self.buffer, "\x1B[?25l");
+        self.write("\x1B[?25l".to_string());
     }
     // Show the cursor
     //
@@ -82,7 +72,7 @@ impl Terminal {
     // terminal_formatter.show_cursor();
     // ```
     pub fn show_cursor(&mut self) {
-        let _ = write!(self.buffer, "\x1B[?25h");
+        self.write("\x1B[?25h".to_string());
     }
     // Prints the ansi characters that sets the terminal background color at the current cursor
     // location
@@ -92,7 +82,8 @@ impl Terminal {
     // terminal_formatter.set_background(TerminalColors::HotPink);
     // ```
     pub fn set_background(&mut self, color_code: TerminalColors) {
-        let _ = write!(self.buffer, "\x1b[48;5;{}m", color_code as u32);
+        self.writer
+            .write(format_args!("\x1b[48;5;{}m", color_code as u32));
     }
 
     // Prints the ansi characters that sets the terminal foreground color at the current cursor
@@ -103,7 +94,8 @@ impl Terminal {
     // terminal_formatter.set_foreground(TerminalColors::HotPink);
     // ```
     pub fn set_foreground(&mut self, color_code: TerminalColors) {
-        let _ = write!(self.buffer, "\x1b[38;5;{}m", color_code as u32);
+        self.writer
+            .write(format_args!("\x1b[38;5;{}m", color_code as u32));
     }
 
     // Prints the ansi characters that sets the cursor location on the terminal
@@ -113,7 +105,7 @@ impl Terminal {
     // terminal_formatter.set_cursor_location(0,0);
     // ```
     pub fn set_cursor_location(&mut self, x: u16, y: u16) {
-        let _ = write!(self.buffer, "\x1b[{};{}H", y, x);
+        self.writer.write(format_args!("\x1b[{};{}H", y, x));
     }
 
     // Reset terminal colors and styles
@@ -124,6 +116,6 @@ impl Terminal {
     // terminal_formatter::reset_colors();
     // ```
     pub fn reset_colors(&mut self) {
-        let _ = write!(self.buffer, "\x1B[0m");
+        self.write("\x1B[0m".to_string());
     }
 }

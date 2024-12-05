@@ -46,8 +46,12 @@ impl InputRecord {
             Event: event,
         }
     }
+}
+
+impl TryFrom<INPUT_RECORD> for InputRecord {
+    type Error = ConsoleControlErr;
     // TODO: unit test this b#tch
-    pub fn from_raw(input_rec: INPUT_RECORD) -> Result<Self, ConsoleControlErr> {
+    fn try_from(input_rec: INPUT_RECORD) -> Result<Self, ConsoleControlErr> {
         match input_rec.EventType as u32 {
             KEY_EVENT => Ok(InputRecord {
                 event_type: EventType::KeyEvent,

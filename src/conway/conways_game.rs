@@ -10,7 +10,9 @@ use crate::console::input_record::KeyEvent;
 use crate::conway::command::Command;
 use crate::conway::conways_law;
 use crate::coordinate::Coord;
-use crate::terminal_formatter;
+use crate::terminal::formatter::TerminalColors;
+use crate::terminal::message_helper::MessageHelper;
+use crate::terminal::shared_writer::SharedWriter;
 
 use super::print_mode::PrintMode;
 use super::settings::ConwaysSettings;
@@ -20,7 +22,7 @@ pub struct ConwaysGame {
     previous: Vec<Vec<bool>>,
     state: ConwaysState,
     settings: ConwaysSettings,
-    out: terminal_formatter::Terminal,
+    screen: MessageHelper,
     receiver: Receiver<KeyEvent>,
 }
 
@@ -78,7 +80,7 @@ impl ConwaysGame {
         ConwaysGame {
             current: new_state.clone(),
             previous: new_prev,
-            out: terminal_formatter::Terminal::init(),
+            screen: MessageHelper::init(SharedWriter::init_std_out()),
             state: ConwaysState {
                 print_mode: mode,
                 latest_command: Command::NONE,
@@ -158,9 +160,8 @@ impl ConwaysGame {
     /// ```
     pub fn run(&mut self) {
         {
-            self.out.lock();
-            self.out.clear();
-            self.out.hide_cursor();
+            self.screen.terminal.clear();
+            self.screen.terminal.hide_cursor();
         }
         let now = SystemTime::now();
         let mut elapsed_prev_game: Duration = Duration::from_secs(0);
@@ -200,7 +201,13 @@ impl ConwaysGame {
             }
 
             self.print(self.state.print_mode);
-            self.out.flush();
+            if self.state.is_paused {
+                let center = self.find_center();
+                self.screen
+                    .print_around_centerpoint("PAUSED".to_string(), center);
+            }
+
+            self.screen.terminal.flush();
             if self.is_stable() {
                 break;
             }
@@ -208,9 +215,8 @@ impl ConwaysGame {
                 self.reset();
             }
         }
-        self.out.lock();
-        self.out.show_cursor();
-        self.out.reset_colors();
+        self.screen.terminal.show_cursor();
+        self.screen.terminal.reset_colors();
     }
     /// Checks if the next and previous frames are the same
     ///
@@ -246,13 +252,13 @@ impl ConwaysGame {
             'm' | 'M' => {
                 self.state.print_mode = match self.state.print_mode {
                     PrintMode::DEBUG => {
-                        self.out.clear();
-                        self.out.hide_cursor();
+                        self.screen.terminal.clear();
+                        self.screen.terminal.hide_cursor();
                         PrintMode::PRETTY
                     }
                     PrintMode::PRETTY => {
-                        self.out.clear();
-                        self.out.hide_cursor();
+                        self.screen.terminal.clear();
+                        self.screen.terminal.hide_cursor();
                         PrintMode::DEBUG
                     }
                 };
@@ -307,7 +313,6 @@ impl ConwaysGame {
     ///      
     ///     █
     pub fn print(&mut self, print_mode: PrintMode) {
-        self.out.lock();
         for y in 0..self.settings.y_len {
             for x in 0..self.settings.x_len {
                 self.print_cell(x as u16, y as u16, self.current[y][x], print_mode);
@@ -332,32 +337,36 @@ impl ConwaysGame {
             + 1
             + self.settings.y_len as u16
             + self.settings.origin.y;
-        self.out.set_cursor_location(x_start, y_start);
-        self.out
-            .set_background(terminal_formatter::TerminalColors::White);
-        self.out
-            .set_foreground(terminal_formatter::TerminalColors::Red);
-        self.out.writeln(format!("Round {}. ", self.state.rounds));
-        self.out.writeln(format!(
+        self.screen.terminal.set_cursor_location(x_start, y_start);
+        self.screen.terminal.set_background(TerminalColors::White);
+        self.screen.terminal.set_foreground(TerminalColors::Red);
+        self.screen
+            .terminal
+            .writeln(format!("Round {}. ", self.state.rounds));
+        self.screen.terminal.writeln(format!(
             "Latest Command: cmd - '{}', input - '{}'",
             self.state.latest_command, self.state.latest_input
         ));
 
-        self.out
+        self.screen
+            .terminal
             .writeln(format!("Cmd count: {}", self.state.command_count));
-        self.out.writeln(format!("Mode: {}", self.state.print_mode));
-        self.out
+        self.screen
+            .terminal
+            .writeln(format!("Mode: {}", self.state.print_mode));
+        self.screen
+            .terminal
             .writeln(format!("Is Paused: {}", self.state.is_paused));
-        self.out
+        self.screen
+            .terminal
             .writeln(format!("FPS Count: {}", self.state.fps_last));
         let center = self.find_center();
-        self.out.writeln(format!("Center: {}", center));
+        self.screen.terminal.writeln(format!("Center: {}", center));
         if self.state.latest_err != "" {
-            self.out
-                .set_background(terminal_formatter::TerminalColors::Red);
-            self.out
-                .set_foreground(terminal_formatter::TerminalColors::White);
-            self.out
+            self.screen.terminal.set_background(TerminalColors::Red);
+            self.screen.terminal.set_foreground(TerminalColors::White);
+            self.screen
+                .terminal
                 .writeln(format!("Error: {}", self.state.latest_err));
         }
     }
@@ -390,20 +399,19 @@ impl ConwaysGame {
             PrintMode::PRETTY => {
                 for y_offset in 0..self.settings.cell_view_height {
                     for x_offset in 0..self.settings.cell_view_width {
-                        self.out
+                        self.screen
+                            .terminal
                             .set_cursor_location(x_start + x_offset, y_start + y_offset);
                         if is_alive {
-                            self.out
-                                .set_background(terminal_formatter::TerminalColors::LightGreen);
-                            self.out
-                                .set_foreground(terminal_formatter::TerminalColors::Black);
+                            self.screen
+                                .terminal
+                                .set_background(TerminalColors::LightGreen);
+                            self.screen.terminal.set_foreground(TerminalColors::Black);
                         } else {
-                            self.out
-                                .set_background(terminal_formatter::TerminalColors::Red);
-                            self.out
-                                .set_foreground(terminal_formatter::TerminalColors::White);
+                            self.screen.terminal.set_background(TerminalColors::Red);
+                            self.screen.terminal.set_foreground(TerminalColors::White);
                         }
-                        self.out.write(" ".to_string());
+                        self.screen.terminal.write(" ".to_string());
                     }
                 }
             }
@@ -413,67 +421,64 @@ impl ConwaysGame {
                     for x_offset in 0..self.settings.cell_view_width + debug_width {
                         // TODO: this can be improved
                         // i dont need to set the background here every time
-                        self.out
+                        self.screen
+                            .terminal
                             .set_cursor_location(x_start + x_offset, y_start + y_offset);
                         if x_offset == 0 {
                             if is_alive {
-                                self.out
-                                    .set_background(terminal_formatter::TerminalColors::LightGreen);
-                                self.out
-                                    .set_foreground(terminal_formatter::TerminalColors::Black);
+                                self.screen
+                                    .terminal
+                                    .set_background(TerminalColors::LightGreen);
+                                self.screen.terminal.set_foreground(TerminalColors::Black);
                             } else {
-                                self.out
-                                    .set_background(terminal_formatter::TerminalColors::Red);
-                                self.out
-                                    .set_foreground(terminal_formatter::TerminalColors::White);
+                                self.screen.terminal.set_background(TerminalColors::Red);
+                                self.screen.terminal.set_foreground(TerminalColors::White);
                             }
                         }
 
                         if x_offset < self.settings.cell_view_width {
-                            self.out.write(format!(
+                            self.screen.terminal.write(format!(
                                 "{}",
                                 y_offset * self.settings.cell_view_height + x_offset + y_offset
                             ));
                         } else {
-                            self.out.write(" ".to_string());
+                            self.screen.terminal.write(" ".to_string());
                         }
                     }
                 }
 
-                self.out
+                self.screen
+                    .terminal
                     .set_cursor_location(x_start + self.settings.cell_view_width, y_start);
 
                 if is_alive {
-                    self.out
-                        .set_background(terminal_formatter::TerminalColors::LightGreen);
-                    self.out
-                        .set_foreground(terminal_formatter::TerminalColors::Black);
-                    self.out.write(" true ".to_string());
+                    self.screen
+                        .terminal
+                        .set_background(TerminalColors::LightGreen);
+                    self.screen.terminal.set_foreground(TerminalColors::Black);
+                    self.screen.terminal.write(" true ".to_string());
                 } else {
-                    self.out
-                        .set_background(terminal_formatter::TerminalColors::Red);
-                    self.out
-                        .set_foreground(terminal_formatter::TerminalColors::White);
-                    self.out.write(" false".to_string());
+                    self.screen.terminal.set_background(TerminalColors::Red);
+                    self.screen.terminal.set_foreground(TerminalColors::White);
+                    self.screen.terminal.write(" false".to_string());
                 }
-                self.out
+                self.screen
+                    .terminal
                     .set_cursor_location(x_start + self.settings.cell_view_width, y_start + 1);
 
                 if is_alive {
-                    self.out
-                        .set_background(terminal_formatter::TerminalColors::LightGreen);
-                    self.out
-                        .set_foreground(terminal_formatter::TerminalColors::Black);
+                    self.screen
+                        .terminal
+                        .set_background(TerminalColors::LightGreen);
+                    self.screen.terminal.set_foreground(TerminalColors::Black);
                 } else {
-                    self.out
-                        .set_background(terminal_formatter::TerminalColors::Red);
-                    self.out
-                        .set_foreground(terminal_formatter::TerminalColors::White);
+                    self.screen.terminal.set_background(TerminalColors::Red);
+                    self.screen.terminal.set_foreground(TerminalColors::White);
                 }
-                self.out.write(format!(" {}:{}", x, y));
+                self.screen.terminal.write(format!(" {}:{}", x, y));
             }
         }
-        self.out.flush();
+        self.screen.terminal.flush();
     }
     /// Calculate and apply the next frame, while the calculations are running the current and the
     /// previous are the same
@@ -560,14 +565,14 @@ impl ConwaysGame {
             + self.settings.y_len as u16
             + self.settings.origin.y;
         for y_loc in 0..total_height {
-            self.out.set_cursor_location(0, y_loc);
-            self.out.clear_line();
+            self.screen.terminal.set_cursor_location(0, y_loc);
+            self.screen.terminal.clear_line();
         }
         if self.state.print_mode == PrintMode::DEBUG {
             //TODO: this hardcoded 6 is painfull to see
             for y_loc in total_height + 1..total_height + 8 {
-                self.out.set_cursor_location(0, y_loc);
-                self.out.clear_line();
+                self.screen.terminal.set_cursor_location(0, y_loc);
+                self.screen.terminal.clear_line();
             }
         }
     }

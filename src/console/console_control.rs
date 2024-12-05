@@ -103,7 +103,7 @@ impl ConsoleControl {
     pub fn read_console_input(&self) -> Result<KeyEvent, ConsoleControlErr> {
         // TODO: handle these errors
         let input_rec_raw = self.read_console_input_raw()?;
-        let input_rec: InputRecord = InputRecord::from_raw(input_rec_raw)?;
+        let input_rec: InputRecord = InputRecord::try_from(input_rec_raw)?;
 
         match input_rec.event_type {
             EventType::KeyEvent => Ok(unsafe { input_rec.event.key_event }),
