@@ -18,8 +18,10 @@ impl MessageHelper {
         let width = (char_count as f32 / 2.0).floor() as u16;
         let mut x_start = 0;
 
-        if center.x > width {
-            x_start = center.x - (width as u16 * char_width);
+        panic!("unit test this");
+        let width_to_subtract = width as u16 * char_width;
+        if center.x > width_to_subtract {
+            x_start = center.x - (width_to_subtract);
         }
         let location = Coord {
             x: x_start,
@@ -30,13 +32,10 @@ impl MessageHelper {
     pub fn print(&mut self, message: String, location: Coord) {
         let chars: Vec<char> = message.chars().collect();
         for row in 0 as usize..5 {
-            println!("setting cursor");
             self.terminal
                 .set_cursor_location(location.x, row as u16 + location.y);
 
-            println!("setting background colors");
             self.terminal.set_background(TerminalColors::White);
-            println!("setting foreground colors");
             self.terminal.set_foreground(TerminalColors::Red);
             for ind in 0..chars.len() {
                 let current: char = match chars.get(ind) {
@@ -54,10 +53,8 @@ impl MessageHelper {
                     }
                 };
                 let printable_row: &str = printable_char[row];
-                println!("printing chars:{:?}", printable_row);
                 self.terminal.write(printable_row.to_string());
             }
-            println!("flush");
             self.terminal.flush();
         }
     }
