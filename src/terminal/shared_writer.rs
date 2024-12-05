@@ -58,7 +58,10 @@ mod tests {
         let buffer = Arc::new(Mutex::new(Vec::new()));
         let writer = SharedWriter::init(buffer.clone());
         let test_str = "Hello world";
-        writer.write(format_args!("{}", test_str));
+        let _ = match writer.write(format_args!("{}", test_str)) {
+            Ok(_) => (),
+            Err(_) => assert!(false, "This should never happen"),
+        };
 
         let unwrapped = buffer.lock().unwrap();
         let result = String::from_utf8_lossy(&unwrapped);

@@ -1,5 +1,3 @@
-use std::io::Write;
-
 use super::shared_writer::SharedWriter;
 
 pub struct Terminal {
@@ -25,13 +23,22 @@ impl Terminal {
         Terminal { writer: w }
     }
     pub fn write(&mut self, val: String) {
-        self.writer.write(format_args!("{}", val));
+        let _ = match self.writer.write(format_args!("{}", val)) {
+            Ok(_) => (),
+            Err(_) => assert!(false, "TODO: Handle write failures"),
+        };
     }
     pub fn writeln(&mut self, val: String) {
-        self.writer.write(format_args!("\x1b[2K{}", val));
+        let _ = match self.writer.write(format_args!("\x1b[2K{}", val)) {
+            Ok(_) => (),
+            Err(_) => assert!(false, "TODO: Handle write failures"),
+        };
     }
     pub fn flush(&mut self) {
-        self.writer.flush();
+        let _ = match self.writer.flush() {
+            Ok(_) => (),
+            Err(_) => assert!(false, "TODO: Handle flush failures"),
+        };
     }
 
     // Clear the terminal
@@ -82,8 +89,13 @@ impl Terminal {
     // terminal_formatter.set_background(TerminalColors::HotPink);
     // ```
     pub fn set_background(&mut self, color_code: TerminalColors) {
-        self.writer
-            .write(format_args!("\x1b[48;5;{}m", color_code as u32));
+        let _ = match self
+            .writer
+            .write(format_args!("\x1b[48;5;{}m", color_code as u32))
+        {
+            Ok(_) => (),
+            Err(_) => assert!(false, "TODO: Handle write failures"),
+        };
     }
 
     // Prints the ansi characters that sets the terminal foreground color at the current cursor
@@ -94,8 +106,13 @@ impl Terminal {
     // terminal_formatter.set_foreground(TerminalColors::HotPink);
     // ```
     pub fn set_foreground(&mut self, color_code: TerminalColors) {
-        self.writer
-            .write(format_args!("\x1b[38;5;{}m", color_code as u32));
+        let _ = match self
+            .writer
+            .write(format_args!("\x1b[38;5;{}m", color_code as u32))
+        {
+            Ok(_) => (),
+            Err(_) => assert!(false, "TODO: Handle write failures"),
+        };
     }
 
     // Prints the ansi characters that sets the cursor location on the terminal
@@ -105,7 +122,10 @@ impl Terminal {
     // terminal_formatter.set_cursor_location(0,0);
     // ```
     pub fn set_cursor_location(&mut self, x: u16, y: u16) {
-        self.writer.write(format_args!("\x1b[{};{}H", y, x));
+        let _ = match self.writer.write(format_args!("\x1b[{};{}H", y, x)) {
+            Ok(_) => (),
+            Err(_) => assert!(false, "TODO: Handle write failures"),
+        };
     }
 
     // Reset terminal colors and styles
