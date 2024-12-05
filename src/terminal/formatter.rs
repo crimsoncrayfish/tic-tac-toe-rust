@@ -29,7 +29,7 @@ impl Terminal {
         };
     }
     pub fn writeln(&mut self, val: String) {
-        let _ = match self.writer.write(format_args!("\x1b[2K{}", val)) {
+        let _ = match self.writer.writeln(format_args!("\x1b[2K{}", val)) {
             Ok(_) => (),
             Err(_) => assert!(false, "TODO: Handle write failures"),
         };

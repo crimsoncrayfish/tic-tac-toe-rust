@@ -25,6 +25,15 @@ impl SharedWriter {
         let _ = locked_writer.write_fmt(args);
         Ok(())
     }
+    pub fn writeln(&self, args: std::fmt::Arguments) -> Result<(), SharedWriterErr> {
+        let mut locked_writer = match self.writer.lock() {
+            Ok(result) => result,
+            Err(_) => return Err(SharedWriterErr::FailedToLock),
+        };
+        let _ = locked_writer.write_fmt(args);
+        let _ = locked_writer.write_all(b"\n");
+        Ok(())
+    }
     pub fn flush(&self) -> Result<(), SharedWriterErr> {
         let mut locked_writer = match self.writer.lock() {
             Ok(result) => result,

@@ -16,6 +16,7 @@ where
             });
         }
     }
+    print!("reading args");
 
     out
 }

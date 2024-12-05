@@ -1,8 +1,6 @@
 use std::{
     env,
     sync::mpsc::{self},
-    thread::sleep,
-    time::Duration,
 };
 
 use arg_helper::read_config;
@@ -31,13 +29,13 @@ pub mod terminal {
     pub mod message_helper;
     pub mod shared_writer;
 }
+pub mod helper_macros;
 
 fn main() -> Result<(), ConsoleControlErr> {
-    sleep(Duration::from_secs(3));
+    let args: Vec<String> = env::args().collect();
+
     let (transmitter, receiver) = mpsc::channel();
     let _handle = notify_inputs::listen_and_notify_key_inputs(transmitter);
-
-    let args: Vec<String> = env::args().collect();
 
     let x_len: usize = read_config(&args, "--x-len".to_string(), 10);
     let y_len: usize = read_config(&args, "--y-len".to_string(), 7);

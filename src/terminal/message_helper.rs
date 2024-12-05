@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
-use crate::coordinate::Coord;
+use crate::{assert_r, coordinate::Coord};
 
 use super::{
     formatter::{Terminal, TerminalColors},
@@ -11,53 +11,87 @@ pub struct MessageHelper {
     characters: HashMap<char, [&'static str; 5]>,
     pub terminal: Terminal,
 }
+#[derive(Debug, PartialEq)]
+pub enum MessageHelperErr {
+    UnsupportedCharacters,
+    MessageOutOfBounds,
+    UnexpecterMessageLength,
+}
+impl Display for MessageHelperErr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UnsupportedCharacters => write!(f, "Unsupported character"),
+            Self::MessageOutOfBounds => write!(f, "Message out of bounds"),
+            Self::UnexpecterMessageLength => write!(f, "Unexpected message length"),
+        }
+    }
+}
 impl MessageHelper {
-    pub fn print_around_centerpoint(&mut self, message: String, center: Coord) {
+    pub fn print_around_centerpoint(
+        &mut self,
+        message: String,
+        center: Coord,
+    ) -> Result<(), MessageHelperErr> {
+        let origin = self.calculate_origin(message.clone(), center);
+
+        assert_r!(
+            origin.x > 0 && origin.y > 0,
+            MessageHelperErr::MessageOutOfBounds
+        );
+
+        self.print(message, origin)
+    }
+
+    pub fn calculate_origin(&self, message: String, center: Coord) -> Coord {
         let char_width = 7;
         let char_count = message.len() as u16;
         let width = (char_count as f32 / 2.0).floor() as u16;
-        let mut x_start = 0;
+        let mut x_start = 1;
 
-        panic!("unit test this");
         let width_to_subtract = width as u16 * char_width;
         if center.x > width_to_subtract {
             x_start = center.x - (width_to_subtract);
         }
-        let location = Coord {
+
+        let mut y_start = 1;
+        if center.y > 2 {
+            y_start = center.y - 2;
+        }
+        Coord {
             x: x_start,
-            y: center.y - 2,
-        };
-        self.print(message, location);
+            y: y_start,
+        }
     }
-    pub fn print(&mut self, message: String, location: Coord) {
+
+    pub fn print(&mut self, message: String, origin: Coord) -> Result<(), MessageHelperErr> {
+        assert!(
+            origin.x > 0 && origin.y > 0,
+            "terminal locations are 1 indexed"
+        );
         let chars: Vec<char> = message.chars().collect();
         for row in 0 as usize..5 {
             self.terminal
-                .set_cursor_location(location.x, row as u16 + location.y);
+                .set_cursor_location(origin.x, row as u16 + origin.y);
 
             self.terminal.set_background(TerminalColors::White);
             self.terminal.set_foreground(TerminalColors::Red);
             for ind in 0..chars.len() {
                 let current: char = match chars.get(ind) {
                     Some(ch) => ch.to_lowercase().next().unwrap(),
-                    None => {
-                        assert!(false, "This should never happen as the index is calculated");
-                        continue;
-                    }
+                    None => return Err(MessageHelperErr::UnexpecterMessageLength),
                 };
                 let printable_char: [&'static str; 5] = match self.characters.get(&current) {
                     Some(printable) => *printable,
-                    None => {
-                        assert!(false, "Character not supported");
-                        continue;
-                    }
+                    None => return Err(MessageHelperErr::UnsupportedCharacters),
                 };
                 let printable_row: &str = printable_char[row];
                 self.terminal.write(printable_row.to_string());
             }
             self.terminal.flush();
         }
+        Ok(())
     }
+
     pub fn init(w: SharedWriter) -> Self {
         let mut characters: HashMap<char, [&'static str; 5]> = HashMap::new();
         characters.insert(' ', SPACE);
@@ -370,19 +404,81 @@ mod tests {
 
     use crate::terminal::shared_writer::SharedWriter;
 
-    use super::MessageHelper;
+    use super::{MessageHelper, MessageHelperErr};
 
     #[test]
-    fn print_at() {
+    fn print_at_origin() {
         let buffer = Arc::new(Mutex::new(Vec::new()));
         let writer = SharedWriter::init(buffer.clone());
         let mut helper = MessageHelper::init(writer);
 
-        helper.print("hello".to_string(), crate::coordinate::Coord { x: 0, y: 0 });
+        match helper.print("hello".to_string(), crate::coordinate::Coord { x: 1, y: 1 }) {
+            Ok(_) => (),
+            Err(_) => assert!(false, "Should not have an error at this point"),
+        };
 
         let unwrapped = buffer.lock().unwrap();
         let result = String::from_utf8_lossy(&unwrapped);
+        let expected ="\u{1b}[1;1H\u{1b}[48;5;231m\u{1b}[38;5;160m █   █  █████  █      █       ███  \u{1b}[2;1H\u{1b}[48;5;231m\u{1b}[38;5;160m █   █  █      █      █      █   █ \u{1b}[3;1H\u{1b}[48;5;231m\u{1b}[38;5;160m █████  ████   █      █      █   █ \u{1b}[4;1H\u{1b}[48;5;231m\u{1b}[38;5;160m █   █  █      █      █      █   █ \u{1b}[5;1H\u{1b}[48;5;231m\u{1b}[38;5;160m █   █  █████  █████  █████   ███  ";
+        assert_eq!(
+            expected, result,
+            "The output written should look like a chunky version of the string \"hello\""
+        )
+    }
+    #[test]
+    fn print_at_location() {
+        let buffer = Arc::new(Mutex::new(Vec::new()));
+        let writer = SharedWriter::init(buffer.clone());
+        let mut helper = MessageHelper::init(writer);
+        match helper.print(
+            "world".to_string(),
+            crate::coordinate::Coord { x: 10, y: 18 },
+        ) {
+            Ok(_) => (),
+            Err(_) => assert!(false, "Should not have an error at this point"),
+        };
 
-        print!("OUTPUT:\"{}\"\n", result);
+        let unwrapped = buffer.lock().unwrap();
+        let result = String::from_utf8_lossy(&unwrapped);
+        let expected = "\u{1b}[18;10H\u{1b}[48;5;231m\u{1b}[38;5;160m █   █   ███   ████   █      ███   \u{1b}[19;10H\u{1b}[48;5;231m\u{1b}[38;5;160m █   █  █   █  █   █  █      █  █  \u{1b}[20;10H\u{1b}[48;5;231m\u{1b}[38;5;160m █ █ █  █   █  ████   █      █   █ \u{1b}[21;10H\u{1b}[48;5;231m\u{1b}[38;5;160m ██ ██  █   █  █  █   █      █  █  \u{1b}[22;10H\u{1b}[48;5;231m\u{1b}[38;5;160m █   █   ███   █   █  █████  ███   ";
+        assert_eq!(
+            expected, result,
+            "The output written should look like a chunky version of the string \"world\" but shifter 17 positions down and 9 positions to the right"
+        )
+    }
+    #[test]
+    fn print_around_location() {
+        let buffer = Arc::new(Mutex::new(Vec::new()));
+        let writer = SharedWriter::init(buffer.clone());
+        let mut helper = MessageHelper::init(writer);
+
+        match helper.print_around_centerpoint(
+            "what even".to_string(),
+            crate::coordinate::Coord { x: 10, y: 18 },
+        ) {
+            Ok(_) => (),
+            Err(_) => assert!(false, "Should not have an error at this point"),
+        };
+        let unwrapped = buffer.lock().unwrap();
+        let result = String::from_utf8_lossy(&unwrapped);
+        let expected = "\u{1b}[16;1H\u{1b}[48;5;231m\u{1b}[38;5;160m █   █  █   █   ███   █████         █████  █   █  █████  █   █ \u{1b}[17;1H\u{1b}[48;5;231m\u{1b}[38;5;160m █   █  █   █  █   █    █           █      █   █  █      ██  █ \u{1b}[18;1H\u{1b}[48;5;231m\u{1b}[38;5;160m █ █ █  █████  █████    █           ████   █   █  ████   █ █ █ \u{1b}[19;1H\u{1b}[48;5;231m\u{1b}[38;5;160m ██ ██  █   █  █   █    █           █       █ █   █      █  ██ \u{1b}[20;1H\u{1b}[48;5;231m\u{1b}[38;5;160m █   █  █   █  █   █    █           █████    █    █████  █   █ ";
+        assert_eq!(
+            expected, result,
+            "The output written should look like a chunky version of the string \"what even\" but printed around the centerpoint x = 10 and y = 18"
+        )
+    }
+    #[test]
+    fn print_unsupported_characters() {
+        let buffer = Arc::new(Mutex::new(Vec::new()));
+        let writer = SharedWriter::init(buffer.clone());
+        let mut helper = MessageHelper::init(writer);
+
+        match helper.print_around_centerpoint(
+            "what even?".to_string(),
+            crate::coordinate::Coord { x: 10, y: 18 },
+        ) {
+            Ok(_) => assert!(false, "Should have an error at this point"),
+            Err(e) => assert_eq!(e, MessageHelperErr::UnsupportedCharacters),
+        };
     }
 }

@@ -203,8 +203,13 @@ impl ConwaysGame {
             self.print(self.state.print_mode);
             if self.state.is_paused {
                 let center = self.find_center();
-                self.screen
-                    .print_around_centerpoint("PAUSED".to_string(), center);
+                match self
+                    .screen
+                    .print_around_centerpoint("PAUSED".to_string(), center)
+                {
+                    Ok(_) => (),
+                    Err(e) => self.state.latest_err = e.to_string(),
+                };
             }
 
             self.screen.terminal.flush();
