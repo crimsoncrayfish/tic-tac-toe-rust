@@ -1,49 +1,40 @@
-use std::{
-    env,
-    sync::mpsc::{self},
-};
+use coordination::service::CoordinatorService;
+use std::env;
+use utils::arg_helper::read_config;
 
-use arg_helper::read_config;
-use console::errors::ConsoleControlErr;
-use console::notify_inputs;
-use conway::{conways_game, print_mode::PrintMode};
+pub mod utils {
+    pub mod arg_helper;
+    pub mod helper_macros;
+}
+pub mod coordination {
+    pub mod service;
+}
+pub mod windows {
+    pub mod window;
+}
+pub mod rendering {
+    pub mod colors;
+}
 
-pub mod console {
-    pub mod console_control;
-    pub mod errors;
-    pub mod input_record;
-    pub mod mode;
-    pub mod notify_inputs;
+pub mod shared {
+    pub mod pixel;
+    pub mod usize2d;
 }
-pub mod conway {
-    pub mod command;
-    pub mod conways_game;
-    pub mod conways_law;
-    pub mod print_mode;
-    pub mod settings;
-}
-pub mod arg_helper;
-pub mod coordinate;
-pub mod terminal {
-    pub mod formatter;
-    pub mod message_helper;
-    pub mod shared_writer;
-}
-pub mod helper_macros;
 
-fn main() -> Result<(), ConsoleControlErr> {
+fn main() -> Result<(), SystemException> {
     let args: Vec<String> = env::args().collect();
 
-    let (transmitter, receiver) = mpsc::channel();
-    let _handle = notify_inputs::listen_and_notify_key_inputs(transmitter);
-
-    let x_len: usize = read_config(&args, "--x-len".to_string(), 10);
-    let y_len: usize = read_config(&args, "--y-len".to_string(), 7);
-    let seed: u64 = read_config(&args, "--seed".to_string(), 419);
-    let print_mode: PrintMode = read_config(&args, "--mode".to_string(), PrintMode::PRETTY);
-    let _ = conways_game::ConwaysGame::run_async(x_len, y_len, seed, print_mode, receiver)
-        .join()
-        .unwrap();
+    let _x_len: usize = read_config(&args, "--x-len".to_string(), 10);
+    let _service = CoordinatorService::init();
 
     return Ok(());
+}
+
+#[derive(Debug)]
+enum SystemException {
+    GameException,
+    InputReaderException,
+    CoordinatorException,
+    RedererException,
+    WindowsException,
 }
