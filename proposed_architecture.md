@@ -1,3 +1,15 @@
+# Introduction
+This document describes a multithreaded architecture for a terminal-based game. It is designed to manage game logic, user input and rendering across multiple threads, each dedicated to specific tasks. The design emphasizes modularity, scalability, and responsiveness, leveraging inter-thread communication to coordinate between components.
+
+The interface consists of dynamic terminal "windows," each responsible for rendering specific content. For example, one window displays the game's main output, while another handles debug information. A third and fourth could be added if there was a need to run 2 instances of a game or two entirely separate games side by side. The renderer dynamically adjusts these windows based on user actions, such as toggling visibility or resizing the terminal. An example can be seen below where one of the debug windows is hidden.
+
+A basic wireframe of how the ui could look can be seen below:
+![image](https://github.com/user-attachments/assets/005ceebb-439e-41ec-91f0-fa4f1ba2b24b)
+
+In this example the communication and between threads would look something like this:
+![image](https://github.com/user-attachments/assets/3b3a2002-3e15-4a9d-9c8e-2ab4dba2b2aa)
+
+
 # Terminology
 - Spawn: Initializing an instance of a struct and executing its core loop on a new thread.
 - Send/Notify: Using `std::sync::mpsc::{Sender, Receiver}` to facilitate communication between threads.
@@ -10,6 +22,7 @@ Responsibilities:
 - Manages the lifecycle of all other processes.
 - Ensures proper thread termination when the program exits.
 - Spawns all other processes during initialization.
+![image](https://github.com/user-attachments/assets/2be91573-5c61-4931-b8f6-598d3667e64e)
 
 ## 2. Input Listener
 
@@ -21,6 +34,7 @@ Responsibilities:
     - Terminal resize events
 - Sends all captured events to every other process.
 - Allows each process to handle only the events it is interested in, ignoring others.
+![image](https://github.com/user-attachments/assets/b80511be-ac9d-4d45-8161-4b9e79fa6e72)
 
 ## 3. Renderer
 
@@ -32,6 +46,7 @@ Responsibilities:
     - A window refers to a process responsible for rendering content in a section of the terminal.
 - Supports hiding windows, recalculating space for other windows, and notifying them of layout changes.
 - Collects rendered data from all windows and outputs the final display to the terminal.
+![image](https://github.com/user-attachments/assets/a1541dcf-20e4-4acc-b70a-18bd1f49d374)
 
 ## 4. Windows
 
@@ -40,6 +55,7 @@ Responsibilities:
 - Receives data from the game process.
 - Adjusts game data to fit the available window space before rendering it.
 - Can be activated or deactivated by the game process.
+![image](https://github.com/user-attachments/assets/5ccba192-c9aa-4910-b4b9-cd7fa8d9fb4a)
 
 ## 5. Game Process
 
@@ -52,6 +68,7 @@ Responsibilities:
 - Sends the updated game state to attached windows for rendering.
 - Sends debug information to the Debug Window and manages its visibility (activation/deactivation).
 - Designed to be interchangeable to support other games in the future.
+![image](https://github.com/user-attachments/assets/5e86c9f5-4163-4bfa-9409-44570419ebad)
 
 # Analysis
 ## Inter-Process Communication
