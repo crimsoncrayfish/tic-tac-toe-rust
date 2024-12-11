@@ -1,4 +1,5 @@
 use crate::windows::window::Window;
+use std::sync::mpsc::{channel, Receiver, Sender};
 
 pub struct CoordinatorService {
     state: bool,
@@ -12,6 +13,12 @@ impl CoordinatorService {
             windows: Vec::new(),
         }
     }
+    pub fn new_sender_receiver<T>() -> (Sender<T>, Receiver<T>) {
+        let (sender, receiver): (Sender<T>, Receiver<T>) = channel();
+        (sender, receiver)
+    }
+
+    pub fn new_window(frame_receiver: Receiver<Frame>, resize_receiver: Receiver<Size>) {}
 }
 
 #[cfg(test)]
