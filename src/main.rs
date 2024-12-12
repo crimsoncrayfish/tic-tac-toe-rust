@@ -17,7 +17,7 @@ pub mod rendering {
 }
 
 pub mod shared {
-    pub mod pixel;
+    pub mod frame;
     pub mod usize2d;
 }
 

@@ -1,4 +1,4 @@
-use crate::{shared::pixel::Pixel, shared::usize2d::Usize2d};
+use crate::{shared::frame::Pixel, shared::usize2d::Usize2d};
 
 pub struct Window {
     previous_frame: Vec<Vec<Pixel>>,
@@ -32,7 +32,7 @@ impl Window {
 
 #[cfg(test)]
 mod tests {
-    use crate::shared::{pixel::Pixel, usize2d::Usize2d};
+    use crate::shared::{frame::Pixel, usize2d::Usize2d};
 
     use super::Window;
 

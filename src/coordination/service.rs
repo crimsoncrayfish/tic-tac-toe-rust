@@ -1,4 +1,7 @@
-use crate::windows::window::Window;
+use crate::{
+    shared::{frame::Frame, usize2d::Usize2d},
+    windows::window::Window,
+};
 use std::sync::mpsc::{channel, Receiver, Sender};
 
 pub struct CoordinatorService {
@@ -18,7 +21,7 @@ impl CoordinatorService {
         (sender, receiver)
     }
 
-    pub fn new_window(frame_receiver: Receiver<Frame>, resize_receiver: Receiver<Size>) {}
+    pub fn new_window(frame_receiver: Receiver<Frame>, resize_receiver: Receiver<Usize2d>) {}
 }
 
 #[cfg(test)]
