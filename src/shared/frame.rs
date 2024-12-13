@@ -18,6 +18,24 @@ impl Default for Pixel {
     }
 }
 impl Pixel {
+    /// Get a new instance of a pixel
+    ///
+    /// # Arguments
+    ///
+    /// * `char` - the character to be printed out
+    /// * `background_color` - the background color for the "pixel"
+    /// * `foreground_color` - the foreground color for the "pixel"
+    ///
+    /// # Returns
+    ///
+    /// a new pixel with the character, background and foreground colors set
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let pixel = Pixel::new('A', TerminalColors::Red, TerminalColors::Blue);
+    ///
+    /// ```
     fn new(char: char, background_color: TerminalColors, foreground_color: TerminalColors) -> Self {
         Pixel {
             char,
@@ -26,7 +44,26 @@ impl Pixel {
         }
     }
 
-    pub fn next(self, char: char) -> Self {
+    /// Gets a clone of the previous pixel with a change to the character
+    ///
+    /// # Arguments
+    ///
+    /// * `char` - the character to be printed out
+    ///
+    /// # Returns
+    ///
+    /// a new pixel with the character, background and foreground colors set
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let pixel = Pixel::new('A', TerminalColors::Red, TerminalColors::Blue);
+    /// let new = pixel.next('B');
+    /// assert_eq!(pixel.background_color, new.background_color);
+    /// assert_eq!(pixel.foreground_color, new.foreground_color);
+    /// assert_ne!(pixel.char, new.char)
+    /// ```
+    pub fn next(&self, char: char) -> Self {
         let mut next = self.clone();
         next.char = char;
         next
@@ -67,11 +104,12 @@ mod tests {
     #[test]
     fn next() {
         let actual = Pixel::new('T', TerminalColors::Red, TerminalColors::White);
+        let next = actual.next('R');
+
         assert_eq!(actual.char, 'T');
         assert_eq!(actual.background_color, TerminalColors::Red);
         assert_eq!(actual.foreground_color, TerminalColors::White);
 
-        let next = actual.next('R');
         assert_eq!(next.char, 'R');
         assert_eq!(next.background_color, TerminalColors::Red);
         assert_eq!(next.foreground_color, TerminalColors::White);
