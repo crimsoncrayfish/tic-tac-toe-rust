@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub struct Usize2d {
     pub x: usize,
     pub y: usize,

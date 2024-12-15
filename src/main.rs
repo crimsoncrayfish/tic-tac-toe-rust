@@ -10,6 +10,7 @@ pub mod coordination {
     pub mod service;
 }
 pub mod windows {
+    pub mod errors;
     pub mod window;
 }
 pub mod rendering {

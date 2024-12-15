@@ -21,7 +21,9 @@ impl CoordinatorService {
         (sender, receiver)
     }
 
-    pub fn new_window(frame_receiver: Receiver<Frame>, resize_receiver: Receiver<Usize2d>) {}
+    pub fn new_window(frame_receiver: Receiver<Frame>, resize_receiver: Receiver<Usize2d>) {
+        //-> Result<Window, WindowExeption>
+    }
 }
 
 #[cfg(test)]
