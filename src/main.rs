@@ -10,7 +10,9 @@ pub mod coordination {
     pub mod service;
 }
 pub mod windows {
+    pub mod command_enum;
     pub mod errors;
+    pub mod state;
     pub mod window;
 }
 pub mod rendering {
@@ -39,3 +41,20 @@ enum SystemException {
     RedererException,
     WindowsException,
 }
+
+/// Placeholder
+///
+/// # Arguments
+///
+/// * `my_input` - my input
+///
+/// #Returns
+///
+/// Does placeholder stuff
+///
+/// # Examples
+///
+/// ```
+/// let x = placeholder()
+/// ```
+pub fn placeholder() {}
