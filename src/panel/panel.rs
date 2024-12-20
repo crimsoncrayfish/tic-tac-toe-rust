@@ -280,4 +280,34 @@ mod tests {
             "The process should be completed due to the kill command"
         );
     }
+
+    #[test]
+    fn run_and_write() {
+        let size = Usize2d::new(10, 20);
+        let top_left = Usize2d::new(0, 0);
+        let bottom_right = Usize2d::new(10, 20);
+        let (frame_sender, frame_receiver) = channel();
+        let (command_sender, command_receiver) = channel();
+
+        let handle = Panel::init_run_async(
+            size,
+            top_left,
+            bottom_right,
+            frame_receiver,
+            command_receiver,
+        );
+
+        //TODO: writer and write command
+
+        let result = command_sender.send(PanelCommandEnum::KillProcess);
+        assert!(
+            !result.is_err(),
+            "There should be no bugs when sending the kill command"
+        );
+        sleep(Duration::from_millis(100));
+        assert!(
+            handle.unwrap().is_finished(),
+            "The process should be completed due to the kill command"
+        );
+    }
 }

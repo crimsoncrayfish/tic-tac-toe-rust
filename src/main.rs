@@ -24,6 +24,10 @@ pub mod shared {
     pub mod render_object;
     pub mod usize2d;
 }
+pub mod writer {
+    pub mod handle;
+    pub mod shared_writer;
+}
 
 fn main() -> Result<(), SystemException> {
     let args: Vec<String> = env::args().collect();
