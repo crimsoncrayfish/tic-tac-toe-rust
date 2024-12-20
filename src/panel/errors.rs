@@ -1,4 +1,4 @@
 #[derive(Debug, PartialEq, Eq)]
-pub enum WindowException {
+pub enum PanelException {
     BadCoordinateException,
 }

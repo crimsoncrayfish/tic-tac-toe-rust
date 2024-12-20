@@ -9,11 +9,11 @@ pub mod utils {
 pub mod coordination {
     pub mod service;
 }
-pub mod windows {
+pub mod panel {
     pub mod command_enum;
     pub mod errors;
+    pub mod panel;
     pub mod state;
-    pub mod window;
 }
 pub mod rendering {
     pub mod colors;
@@ -21,6 +21,7 @@ pub mod rendering {
 
 pub mod shared {
     pub mod frame;
+    pub mod render_object;
     pub mod usize2d;
 }
 

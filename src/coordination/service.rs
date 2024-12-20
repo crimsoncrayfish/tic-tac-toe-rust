@@ -1,19 +1,19 @@
 use crate::{
+    panel::panel::Panel,
     shared::{frame::Frame, usize2d::Usize2d},
-    windows::window::Window,
 };
 use std::sync::mpsc::{channel, Receiver, Sender};
 
 pub struct CoordinatorService {
     state: bool,
-    windows: Vec<Window>,
+    panels: Vec<Panel>,
 }
 
 impl CoordinatorService {
     pub fn init() -> Self {
         CoordinatorService {
             state: true,
-            windows: Vec::new(),
+            panels: Vec::new(),
         }
     }
     pub fn new_sender_receiver<T>() -> (Sender<T>, Receiver<T>) {
@@ -21,7 +21,7 @@ impl CoordinatorService {
         (sender, receiver)
     }
 
-    pub fn new_window(frame_receiver: Receiver<Frame>, resize_receiver: Receiver<Usize2d>) {
+    pub fn new_window(_frame_receiver: Receiver<Frame>, _resize_receiver: Receiver<Usize2d>) {
         //-> Result<Window, WindowExeption>
     }
 }
@@ -34,6 +34,6 @@ mod tests {
     fn init() {
         let service = CoordinatorService::init();
         assert_eq!(service.state, true, "After initialization, the service should have a property called state that is set to 'true'");
-        assert_eq!(service.windows.len(), 0, "After initialization, the service should have a property called windowa that is an empty Vec of Window");
+        assert_eq!(service.panels.len(), 0, "After initialization, the service should have a property called windowa that is an empty Vec of Window");
     }
 }

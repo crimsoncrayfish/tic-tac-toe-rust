@@ -1,4 +1,4 @@
-pub enum WindowCommandEnum {
+pub enum PanelCommandEnum {
     KillProcess,
     PauseProcess,
     ClearBuffer,
