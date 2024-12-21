@@ -7,6 +7,7 @@ use crate::{
     assert_r,
     rendering::render_object::RenderObject,
     shared::{frame::Pixel, usize2d::Usize2d},
+    writer::handle::Handle,
 };
 
 use super::{command_enum::PanelCommandEnum, errors::PanelException, state::PanelState};
@@ -29,7 +30,7 @@ pub struct Panel {
     frame_receiver: Receiver<Vec<RenderObject>>,
     command_receiver: Receiver<PanelCommandEnum>,
     state: PanelState,
-    // TODO: add a writer
+    writer: Box<dyn Handle>,
 }
 impl Panel {
     /// Initialize an instance of Window
@@ -64,6 +65,7 @@ impl Panel {
         bottom_right: Usize2d,
         frame_receiver: Receiver<Vec<RenderObject>>,
         command_receiver: Receiver<PanelCommandEnum>,
+        handle: Box<dyn Handle>,
     ) -> Result<Self, PanelException> {
         let new_state = vec![vec![Pixel::default(); size.x]; size.y];
         assert_r!(
@@ -82,6 +84,7 @@ impl Panel {
             frame_receiver,
             command_receiver,
             state: PanelState::default(),
+            writer: handle,
         })
     }
 
@@ -167,6 +170,7 @@ impl Panel {
         bottom_right: Usize2d,
         frame_receiver: Receiver<Vec<RenderObject>>,
         command_receiver: Receiver<PanelCommandEnum>,
+        handle: Box<dyn Handle>,
     ) -> Result<JoinHandle<()>, PanelException> {
         let mut w = Panel::init(
             size,
@@ -174,6 +178,7 @@ impl Panel {
             bottom_right,
             frame_receiver,
             command_receiver,
+            handle,
         )?;
         let window_closure = move || {
             w.run();
@@ -211,16 +216,12 @@ impl Panel {
 
 #[cfg(test)]
 mod tests {
-    use std::{slice::Windows, sync::mpsc::channel, thread::sleep, time::Duration};
-
-    use windows_sys::Win32;
+    use std::{sync::mpsc::channel, thread::sleep, time::Duration};
 
     use crate::{
-        panel::{self, command_enum::PanelCommandEnum, errors::PanelException},
-        shared::{
-            frame::Pixel,
-            usize2d::{self, Usize2d},
-        },
+        panel::{command_enum::PanelCommandEnum, errors::PanelException},
+        shared::{frame::Pixel, usize2d::Usize2d},
+        writer::memory_handle::MemoryHandle,
     };
 
     use super::Panel;
@@ -230,6 +231,7 @@ mod tests {
         let size = Usize2d::new(10, 20);
         let top_left = Usize2d::new(0, 0);
         let bottom_right = Usize2d::new(10, 20);
+        let handle = Box::new(MemoryHandle::new());
         let (_, frame_receiver) = channel();
         let (_, command_receiver) = channel();
 
@@ -239,6 +241,7 @@ mod tests {
             bottom_right,
             frame_receiver,
             command_receiver,
+            handle,
         );
         assert!(window.is_ok());
         let window = window.unwrap();
@@ -252,6 +255,7 @@ mod tests {
         let size = Usize2d::new(10, 20);
         let top_left = Usize2d::new(1, 0);
         let bottom_right = Usize2d::new(0, 20);
+        let handle = Box::new(MemoryHandle::new());
         let (_, frame_receiver) = channel();
         let (_, command_receiver) = channel();
 
@@ -261,7 +265,9 @@ mod tests {
             bottom_right,
             frame_receiver,
             command_receiver,
+            handle,
         );
+
         assert!(window.is_err());
         let error = window.unwrap_err();
         assert!(error == PanelException::BadCoordinateException);
@@ -272,6 +278,7 @@ mod tests {
         let size = Usize2d::new(10, 20);
         let top_left = Usize2d::new(0, 1);
         let bottom_right = Usize2d::new(10, 0);
+        let handle = Box::new(MemoryHandle::new());
         let (_, frame_receiver) = channel();
         let (_, command_receiver) = channel();
 
@@ -281,6 +288,7 @@ mod tests {
             bottom_right,
             frame_receiver,
             command_receiver,
+            handle,
         );
         assert!(window.is_err());
         let error = window.unwrap_err();
@@ -292,6 +300,7 @@ mod tests {
         let size = Usize2d::new(10, 20);
         let top_left = Usize2d::new(0, 0);
         let bottom_right = Usize2d::new(10, 20);
+        let handle = Box::new(MemoryHandle::new());
         let (_, frame_receiver) = channel();
         let (command_sender, command_receiver) = channel();
 
@@ -301,6 +310,7 @@ mod tests {
             bottom_right,
             frame_receiver,
             command_receiver,
+            handle,
         );
         let result = command_sender.send(PanelCommandEnum::KillProcess);
         assert!(
@@ -319,7 +329,8 @@ mod tests {
         let size = Usize2d::new(10, 20);
         let top_left = Usize2d::new(0, 0);
         let bottom_right = Usize2d::new(10, 20);
-        let (frame_sender, frame_receiver) = channel();
+        let handle = Box::new(MemoryHandle::new());
+        let (_frame_sender, frame_receiver) = channel();
         let (command_sender, command_receiver) = channel();
 
         let handle = Panel::init_run_async(
@@ -328,6 +339,7 @@ mod tests {
             bottom_right,
             frame_receiver,
             command_receiver,
+            handle,
         );
 
         //TODO: writer and write command
@@ -363,12 +375,14 @@ mod tests {
 
         let (_, frame_receiver) = channel();
         let (_, command_receiver) = channel();
+        let handle = Box::new(MemoryHandle::new());
         let w = Panel::init(
             Usize2d::default(),
             top_left,
             bottom_right,
             frame_receiver,
             command_receiver,
+            handle,
         );
         assert!(w.is_ok());
         let mut w = w.unwrap();

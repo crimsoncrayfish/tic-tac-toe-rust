@@ -1,24 +1,25 @@
 use std::{
     fmt::Display,
-    io::Write,
     sync::{Arc, Mutex},
 };
 
-pub struct SharedWriter {
-    writer: Arc<Mutex<dyn Write + Send>>,
+use super::{handle::Handle, std_io_handle::StdIOHandle};
+
+pub struct SharedHandle {
+    handle: Arc<Mutex<dyn Handle>>,
 }
 
-impl SharedWriter {
-    pub fn init(writer: Arc<Mutex<dyn Write + Send>>) -> Self {
-        SharedWriter { writer }
+impl SharedHandle {
+    pub fn init(writer: Arc<Mutex<dyn Handle>>) -> Self {
+        SharedHandle { handle: writer }
     }
     pub fn init_std_out() -> Self {
-        SharedWriter {
-            writer: Arc::new(Mutex::new(std::io::stdout())),
+        SharedHandle {
+            handle: Arc::new(Mutex::new(StdIOHandle::new())),
         }
     }
     pub fn write(&self, args: std::fmt::Arguments) -> Result<(), SharedWriterErr> {
-        let mut locked_writer = match self.writer.lock() {
+        let mut locked_writer = match self.handle.lock() {
             Ok(result) => result,
             Err(_) => return Err(SharedWriterErr::FailedToLock),
         };
@@ -26,7 +27,7 @@ impl SharedWriter {
         Ok(())
     }
     pub fn writeln(&self, args: std::fmt::Arguments) -> Result<(), SharedWriterErr> {
-        let mut locked_writer = match self.writer.lock() {
+        let mut locked_writer = match self.handle.lock() {
             Ok(result) => result,
             Err(_) => return Err(SharedWriterErr::FailedToLock),
         };
@@ -35,7 +36,7 @@ impl SharedWriter {
         Ok(())
     }
     pub fn flush(&self) -> Result<(), SharedWriterErr> {
-        let mut locked_writer = match self.writer.lock() {
+        let mut locked_writer = match self.handle.lock() {
             Ok(result) => result,
             Err(_) => return Err(SharedWriterErr::FailedToLock),
         };
@@ -60,19 +61,23 @@ impl Display for SharedWriterErr {
 mod tests {
     use std::sync::{Arc, Mutex};
 
-    use super::SharedWriter;
+    use crate::writer::memory_handle::MemoryHandle;
+
+    use super::SharedHandle;
 
     #[test]
     fn hello_world() {
-        let buffer = Arc::new(Mutex::new(Vec::new()));
-        let writer = SharedWriter::init(buffer.clone());
+        let buffer = Arc::new(Mutex::new(MemoryHandle::new()));
+        let writer = SharedHandle::init(buffer.clone());
         let test_str = "Hello world";
         let _ = match writer.write(format_args!("{}", test_str)) {
             Ok(_) => (),
             Err(_) => assert!(false, "This should never happen"),
         };
+        let result = writer.flush();
+        assert!(result.is_ok());
 
-        let unwrapped = buffer.lock().unwrap();
+        let unwrapped: Vec<u8> = buffer.lock().unwrap().get_buffer_content();
         let result = String::from_utf8_lossy(&unwrapped);
 
         assert_eq!(test_str, result);

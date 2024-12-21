@@ -27,7 +27,10 @@ pub mod shared {
 }
 pub mod writer {
     pub mod handle;
-    pub mod shared_writer;
+    pub mod handle_error;
+    pub mod memory_handle;
+    pub mod shared_handle;
+    pub mod std_io_handle;
 }
 
 fn main() -> Result<(), SystemException> {
