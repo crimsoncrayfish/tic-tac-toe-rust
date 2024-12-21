@@ -5,7 +5,8 @@ use std::{
 
 use crate::{
     assert_r,
-    shared::{frame::Pixel, render_object::RenderObject, usize2d::Usize2d},
+    rendering::render_object::RenderObject,
+    shared::{frame::Pixel, usize2d::Usize2d},
 };
 
 use super::{command_enum::PanelCommandEnum, errors::PanelException, state::PanelState};
@@ -142,7 +143,7 @@ impl Panel {
     /// * `frame_receiver` - receives the next frame to be printed
     /// * `command_receiver` - receives the commands for the window e.g. kill_process, resize_window
     ///
-    /// #Returns
+    /// # Returns
     ///
     /// A JoinHandle that can be used to block the main thread from exiting untill this process has
     /// been killed
@@ -179,15 +180,47 @@ impl Panel {
         };
         Ok(spawn(window_closure))
     }
+    /// Test if a coordinate is inside the panel
+    ///
+    /// # Arguments
+    ///
+    /// * `coord` - the coordinate to be tested
+    ///
+    /// # Returns
+    /// A boolean value confirming wether the coordinate provided is inside the panel's coordinates
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let size = Usize2d::new(10, 69);
+    /// let top_left= Usize2d::new(0, 0);
+    /// let bottom_right= Usize2d::new(10, 69);
+    /// let bottom_right= Usize2d::new(10, 69);
+    /// let (_, frame_receiver) = channel();
+    /// let (_, command_receiver) = channel();
+    ///
+    /// let window= Window::init(size, top_left, bottom_right, frame_receiver, command_receiver);
+    /// ```
+    pub fn coord_is_in_panel(&mut self, coord: Usize2d) -> bool {
+        coord.x >= self.top_left.x
+            && coord.x <= self.bottom_right.x
+            && coord.y >= self.top_left.y
+            && coord.y <= self.bottom_right.y
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{sync::mpsc::channel, thread::sleep, time::Duration};
+    use std::{slice::Windows, sync::mpsc::channel, thread::sleep, time::Duration};
+
+    use windows_sys::Win32;
 
     use crate::{
-        panel::{command_enum::PanelCommandEnum, errors::PanelException},
-        shared::{frame::Pixel, usize2d::Usize2d},
+        panel::{self, command_enum::PanelCommandEnum, errors::PanelException},
+        shared::{
+            frame::Pixel,
+            usize2d::{self, Usize2d},
+        },
     };
 
     use super::Panel;
@@ -308,6 +341,100 @@ mod tests {
         assert!(
             handle.unwrap().is_finished(),
             "The process should be completed due to the kill command"
+        );
+    }
+
+    #[test]
+    fn valid_coordinate() {
+        let top_left = Usize2d::new(5, 7);
+        let bottom_right = Usize2d::new(15, 20);
+
+        let too_far_left = Usize2d::new(4, 8);
+        let too_far_top = Usize2d::new(7, 6);
+        let too_far_right = Usize2d::new(24, 8);
+        let too_far_bottom = Usize2d::new(5, 26);
+
+        let just_right = Usize2d::new(12, 16);
+
+        let borderline_top = Usize2d::new(7, 7);
+        let borderline_bottom = Usize2d::new(8, 20);
+        let borderline_left = Usize2d::new(5, 10);
+        let borderline_right = Usize2d::new(15, 10);
+
+        let (_, frame_receiver) = channel();
+        let (_, command_receiver) = channel();
+        let w = Panel::init(
+            Usize2d::default(),
+            top_left,
+            bottom_right,
+            frame_receiver,
+            command_receiver,
+        );
+        assert!(w.is_ok());
+        let mut w = w.unwrap();
+
+        assert!(
+            !w.coord_is_in_panel(too_far_left.clone()),
+            "This coordinate ({}) is outside of the boundary of the panel (top_left: ({}), bottom_right: ({})",
+            too_far_left,
+            w.top_left,
+            w.bottom_right
+        );
+        assert!(
+            !w.coord_is_in_panel(too_far_top.clone()),
+            "This coordinate ({}) is outside of the boundary of the panel (top_left: ({}), bottom_right: ({})",
+            too_far_top,
+            w.top_left,
+            w.bottom_right
+        );
+        assert!(
+            !w.coord_is_in_panel(too_far_bottom.clone()),
+            "This coordinate ({}) is outside of the boundary of the panel (top_left: ({}), bottom_right: ({})",
+            too_far_bottom,
+            w.top_left,
+            w.bottom_right
+        );
+        assert!(
+            !w.coord_is_in_panel(too_far_right.clone()),
+            "This coordinate ({}) is outside of the boundary of the panel (top_left: ({}), bottom_right: ({})",
+            too_far_right,
+            w.top_left,
+            w.bottom_right
+        );
+        assert!(
+            w.coord_is_in_panel(just_right.clone()),
+            "This coordinate ({}) is inside of the boundary of the panel (top_left: ({}), bottom_right: ({})",
+            just_right,
+            w.top_left,
+            w.bottom_right
+        );
+        assert!(
+            w.coord_is_in_panel(borderline_top.clone()),
+            "This coordinate ({}) is on the boundary of the panel (top_left: ({}), bottom_right: ({})",
+            borderline_top,
+            w.top_left,
+            w.bottom_right
+        );
+        assert!(
+            w.coord_is_in_panel(borderline_bottom.clone()),
+            "This coordinate ({}) is on the boundary of the panel (top_left: ({}), bottom_right: ({})",
+            borderline_bottom,
+            w.top_left,
+            w.bottom_right
+        );
+        assert!(
+            w.coord_is_in_panel(borderline_left.clone()),
+            "This coordinate ({}) is on the boundary of the panel (top_left: ({}), bottom_right: ({})",
+            borderline_left,
+            w.top_left,
+            w.bottom_right
+        );
+        assert!(
+            w.coord_is_in_panel(borderline_right.clone()),
+            "This coordinate ({}) is on the boundary of the panel (top_left: ({}), bottom_right: ({})",
+            borderline_right,
+            w.top_left,
+            w.bottom_right
         );
     }
 }

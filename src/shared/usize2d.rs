@@ -1,4 +1,6 @@
-#[derive(Debug, Default)]
+use std::fmt::Display;
+
+#[derive(Clone, Debug, Default)]
 pub struct Usize2d {
     pub x: usize,
     pub y: usize,
@@ -6,6 +8,11 @@ pub struct Usize2d {
 impl Usize2d {
     pub fn new(x: usize, y: usize) -> Self {
         Usize2d { x, y }
+    }
+}
+impl Display for Usize2d {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "x: {}, y: {}", self.x, self.y)
     }
 }
 #[cfg(test)]

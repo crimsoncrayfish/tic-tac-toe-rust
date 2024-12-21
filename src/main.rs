@@ -17,11 +17,12 @@ pub mod panel {
 }
 pub mod rendering {
     pub mod colors;
+    pub mod render_object;
+    pub mod sprite;
 }
 
 pub mod shared {
     pub mod frame;
-    pub mod render_object;
     pub mod usize2d;
 }
 pub mod writer {
