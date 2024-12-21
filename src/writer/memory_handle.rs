@@ -4,9 +4,9 @@ use std::{
     mem, usize,
 };
 
-use crate::{rendering::colors::TerminalColors, shared::usize2d::Usize2d};
+use crate::{coordination, rendering::colors::TerminalColors, shared::usize2d::Usize2d};
 
-use super::{handle::Handle, handle_error::HandleError};
+use super::handle::Handle;
 
 pub struct MemoryHandle {
     pub buffer: Vec<Vec<u8>>,
@@ -52,13 +52,14 @@ impl Debug for MemoryHandle {
 }
 impl Write for MemoryHandle {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.buffer_temp.push(buf.to_vec());
+        let vec_to_push = buf.to_vec();
+
         Ok(buf.len())
     }
     fn flush(&mut self) -> io::Result<()> {
-        self.buffer = mem::take(&mut self.buffer_temp);
-        self.foreground_color_buffer = mem::take(&mut self.foreground_color_buffer_temp);
-        self.background_color_buffer = mem::take(&mut self.background_color_buffer_temp);
+        self.buffer = self.buffer_temp.clone();
+        self.foreground_color_buffer = self.foreground_color_buffer_temp.clone();
+        self.background_color_buffer = self.background_color_buffer_temp.clone();
         Ok(())
     }
     fn write_fmt(&mut self, fmt: std::fmt::Arguments<'_>) -> io::Result<()> {
@@ -102,7 +103,10 @@ impl Handle for MemoryHandle {
 mod tests {
     use std::io::Write;
 
-    use crate::writer::memory_handle::MemoryHandle;
+    use crate::{
+        shared::usize2d::Usize2d,
+        writer::{handle::Handle, memory_handle::MemoryHandle},
+    };
 
     #[test]
     fn hello_world() {
@@ -119,6 +123,32 @@ mod tests {
         let result = String::from_utf8_lossy(&buffer_content);
 
         let expected = String::from_utf8_lossy(test_str);
+
+        assert_eq!(
+            expected, result,
+            "The initial string written to the MemoryHandle should match to output"
+        );
+    }
+
+    #[test]
+    fn set_location() {
+        let mut handle = MemoryHandle::new();
+
+        let result = handle.set_cursor_location(Usize2d::new(5, 2));
+        assert!(result.is_ok());
+
+        let test_str: &[u8] = b"Hello world";
+        let _ = match handle.write(test_str) {
+            Ok(_) => (),
+            Err(_) => assert!(false, "This should never happen"),
+        };
+        let result = handle.flush();
+        assert!(result.is_ok());
+
+        let buffer_content: Vec<u8> = handle.get_buffer_content();
+        let result = String::from_utf8_lossy(&buffer_content);
+
+        let expected = "\n\n    Hello world".to_string();
 
         assert_eq!(
             expected, result,

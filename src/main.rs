@@ -5,7 +5,9 @@ use utils::arg_helper::read_config;
 pub mod utils {
     pub mod arg_helper;
     pub mod helper_macros;
+    pub mod vec_u8_writer;
 }
+
 pub mod coordination {
     pub mod service;
 }
