@@ -151,6 +151,33 @@ mod tests {
     }
 
     #[test]
+    fn hello_rust() {
+        let mut handle = MemoryHandle::new();
+        let test_str: &[u8] = b"Hello world";
+        let write_result = handle.write(test_str);
+        assert!(write_result.is_ok());
+
+        let set_cursor_result = handle.set_cursor_location(Usize2d::new(6, 0));
+        assert!(set_cursor_result.is_ok());
+
+        let test_str: &[u8] = b"rust ";
+        let write_result = handle.write(test_str);
+        assert!(write_result.is_ok());
+        let result = handle.flush();
+        assert!(result.is_ok());
+
+        let buffer_content: Vec<u8> = handle.get_buffer_content();
+        let result = String::from_utf8_lossy(&buffer_content);
+
+        let expected = String::from_utf8_lossy(b"Hello rust ");
+
+        assert_eq!(
+            expected, result,
+            "The initial string written to the MemoryHandle should match to output"
+        );
+    }
+
+    #[test]
     fn set_location() {
         let mut handle = MemoryHandle::new();
 
@@ -168,11 +195,12 @@ mod tests {
         let buffer_content: Vec<u8> = handle.get_buffer_content();
         let result = String::from_utf8_lossy(&buffer_content);
 
-        let expected = "\n\n    Hello world".to_string();
+        let expected = "\n\n     Hello world".to_string();
 
         assert_eq!(
             expected, result,
-            "The initial string written to the MemoryHandle should match to output"
+            "The initial string written to the MemoryHandle should match to output. Got: \'{}\', Expected: \'{}\'",
+            result, expected
         );
     }
 }
