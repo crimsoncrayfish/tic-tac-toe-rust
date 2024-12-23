@@ -1,0 +1,63 @@
+name: CI Checks
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  build:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build
+      run: cargo build --verbose
+      
+    - name: Run tests
+      id: tests
+      run: |
+        set -e
+        cargo test --verbose > test-results.txt
+        cat test-results.txt 
+        passed=$(grep -oP 'test result:.*?\K\d+(?= passed)' test-results.txt)
+        failed=$(grep -oP 'test result:.*?\K\d+(?= failed)' test-results.txt)
+        total=$((passed + failed))
+        echo "total=$total" >> $GITHUB_ENV
+        echo "passed=$passed" >> $GITHUB_ENV
+        echo "failed=$failed" >> $GITHUB_ENV
+        echo "total=$total"
+        echo "passed=$passed"
+        echo "failed=$failed"
+
+    - name: Post Test Results to PR
+      if: github.event_name == 'pull_request'
+      run: |
+        PR_NUMBER=${{ github.event.pull_request.number }}
+        REPO=${{ github.repository }}
+        BODY="**Unit Test Results**\\nTotal Tests: ${{ env.total }}\\nPassed: ${{ env.passed }}\\nFailed: ${{ env.failed }}\\n"
+        RESPONSE=$(curl -L \
+          -X POST \
+          -H "Accept: application/vnd.github+json" \
+          -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          "https://api.github.com/repos/$REPO/issues/$PR_NUMBER/comments" \
+          -d "{\"body\":\"$BODY\"}")
+        if [[ $? -ne 0 ]]; then
+          echo "Failed to post test results to PR. Response: $RESPONSE"
+          exit 1
+        fi
+
+    - name: Block PR if Tests Fail
+      if: github.event_name == 'pull_request' && env.failed != '0'
+      run: exit 1
