@@ -19,6 +19,12 @@ jobs:
     - name: Build
       run: cargo build --verbose
 
+    - name: Install nightly Rust
+      run: rustup install nightly
+
+    - name: Use nightly Rust
+      run: rustup default nightly
+      
     - name: Run tests
       id: tests
       run: |
