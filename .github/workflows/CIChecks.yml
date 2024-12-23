@@ -35,6 +35,10 @@ jobs:
         echo "total=$total" >> $GITHUB_ENV
         echo "passed=$passed" >> $GITHUB_ENV
         echo "failed=$failed" >> $GITHUB_ENV
+        cat test-results.txt 
+        echo "total=$total"
+        echo "passed=$passed"
+        echo "failed=$failed"
 
     - name: Post Test Results to PR
       if: github.event_name == 'pull_request'
