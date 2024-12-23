@@ -30,7 +30,7 @@ jobs:
         cargo test --verbose > test-results.txt
         cat test-results.txt 
         passed=$(grep -oP 'test result:.*?\K\d+(?= passed)' test-results.txt)
-        failed=$(grep -o 'test result:.*?\K\d+(?= failed)' test-results.txt)
+        failed=$(grep -oP 'test result:.*?\K\d+(?= failed)' test-results.txt)
         total=$((passed + failed))
         echo "total=$total" >> $GITHUB_ENV
         echo "passed=$passed" >> $GITHUB_ENV
