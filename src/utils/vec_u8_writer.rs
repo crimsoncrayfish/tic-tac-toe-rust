@@ -1,5 +1,27 @@
 use std::usize;
 
+/// Write to an existing `Vec<u8>` with a new `Vec<u8>`
+///
+/// # Arguments
+///
+/// * `original` - a `Vec<u8>` that needs to be updated
+/// * `string_to_write` - a `Vec<u8>` that needs to be inserted
+/// * `index` - the starting index where the new string needs to be written to
+///
+/// # Returns
+///
+/// A new `Vec<u8>` e.g.
+/// 'the original', 'new string', 4 => 'the new string'
+///
+/// # Examples
+///
+/// ```
+/// let original_vec: Vec<u8> = "original".as_bytes().to_vec();
+/// let to_write_vec: Vec<u8> = "new string".as_bytes().to_vec();
+/// let result = write_to_location(original_vec.clone(), to_write_vec.clone(), 4);
+///
+/// ```
+///
 pub fn write_to_location(original: Vec<u8>, string_to_write: Vec<u8>, index: usize) -> Vec<u8> {
     if original.len() <= index {
         let mut new_vec: Vec<u8> = original.clone();
@@ -44,6 +66,7 @@ mod tests {
             ("12345", "678", 5, "12345678"),
             ("", "Non-empty", 9, "         Non-empty"),
             ("What even", "", 1, "What even"),
+            ("the original", "new string", 4, "the new string"),
         ];
 
         for (i, (original, to_write, location, expected)) in test_cases.iter().enumerate() {
