@@ -1,0 +1,50 @@
+name: CI Checks
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build
+      run: cargo build --verbose
+
+    - name: Run tests
+      id: tests
+      run: |
+        set -e
+        cargo test --verbose -- --format json > test-results.json
+        # Capture test results in a summary
+        passed=$(grep -o '"event":"ok"' test-results.json | wc -l)
+        failed=$(grep -o '"event":"failed"' test-results.json | wc -l)
+        total=$((passed + failed))
+        echo "total=$total" >> $GITHUB_ENV
+        echo "passed=$passed" >> $GITHUB_ENV
+        echo "failed=$failed" >> $GITHUB_ENV
+
+    - name: Post Test Results to PR
+      if: github.event_name == 'pull_request'
+      uses: marocchino/sticky-pull-request-comment@v3
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        header: Unit Test Results
+        message: |
+          **Unit Test Results**
+          Total: ${{ env.total }}
+          Passed: ${{ env.passed }}
+          Failed: ${{ env.failed }}
+          Pass Rate: $((100 * env.passed / env.total))%
+
+    - name: Block PR if Tests Fail
+      if: github.event_name == 'pull_request' && env.failed != '0'
+      run: exit 1
