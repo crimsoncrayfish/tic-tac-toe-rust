@@ -1,13 +1,9 @@
 use std::usize;
 
 pub fn write_to_location(original: Vec<u8>, string_to_write: Vec<u8>, index: usize) -> Vec<u8> {
-    if original.len() == 0 {
-        return string_to_write;
-    }
-
     if original.len() <= index {
         let mut new_vec: Vec<u8> = original.clone();
-        pad_vec(&mut new_vec, index);
+        pad_vec_up_to(&mut new_vec, index);
         new_vec.extend(string_to_write);
         return new_vec;
     }
@@ -15,7 +11,7 @@ pub fn write_to_location(original: Vec<u8>, string_to_write: Vec<u8>, index: usi
     overwrite_vec_from_index(original.clone(), string_to_write, index)
 }
 
-fn pad_vec(original: &mut Vec<u8>, length: usize) {
+fn pad_vec_up_to(original: &mut Vec<u8>, length: usize) {
     while original.len() < length {
         original.push(b' ');
     }
@@ -39,30 +35,46 @@ mod tests {
     use super::write_to_location;
 
     #[test]
-    fn write_to_empty() {
-        let original: Vec<u8> = Vec::new();
-        let new = write_to_location(original, "Hello".into(), 0);
-        let expected: Vec<u8> = "Hello".into();
-        assert_eq!(new, expected)
-    }
-    #[test]
-    fn write_to_not_empty() {
-        let original: Vec<u8> = "Hello ".into();
-        let new = write_to_location(original.clone(), "World".into(), 6); // Ensure write_to_location takes ownership
-        let expected: Vec<u8> = "Hello World".into(); // Note the extra space
+    fn write_to_location_scenarios() {
+        let test_cases = vec![
+            ("Hello ", "World", 6, "Hello World"),
+            ("Rust", " is great", 4, "Rust is great"),
+            ("Foo Baz", "Bar", 0, "Bar Baz"),
+            ("Foo", "Bar Baz", 0, "Bar Baz"),
+            ("12345", "678", 5, "12345678"),
+            ("", "Non-empty", 9, "         Non-empty"),
+            ("What even", "", 1, "What even"),
+        ];
 
-        let expected_string = String::from_utf8(expected.clone()); // Clone expected for use as Vec<u8> and String
-        assert!(expected_string.is_ok(), "Expected is not valid UTF-8");
+        for (i, (original, to_write, location, expected)) in test_cases.iter().enumerate() {
+            let original_vec: Vec<u8> = original.as_bytes().to_vec();
+            let to_write_vec: Vec<u8> = to_write.as_bytes().to_vec();
+            let expected_vec: Vec<u8> = expected.as_bytes().to_vec();
 
-        let new_string = String::from_utf8(new.clone());
-        assert!(new_string.is_ok(), "New is not valid UTF-8");
+            let result = write_to_location(original_vec.clone(), to_write_vec.clone(), *location);
 
-        assert_eq!(
-            new,
-            expected,
-            "Got: {:?}, Expected: {:?}",
-            new_string.unwrap(),
-            expected_string.unwrap()
-        );
+            let result_string = String::from_utf8(result.clone());
+            let expected_string = String::from_utf8(expected_vec.clone());
+
+            assert!(
+                expected_string.is_ok(),
+                "Test case {}: Expected is not valid UTF-8",
+                i
+            );
+            assert!(
+                result_string.is_ok(),
+                "Test case {}: Result is not valid UTF-8",
+                i
+            );
+
+            assert_eq!(
+                result,
+                expected_vec,
+                "Test case {}: Got: {:?}, Expected: {:?}",
+                i,
+                result_string.unwrap(),
+                expected_string.unwrap()
+            );
+        }
     }
 }
