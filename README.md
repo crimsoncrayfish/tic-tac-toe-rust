@@ -8,6 +8,7 @@
 ## Project Scope
 
 !! This is all depricated comments !!
+TODO: Update this
 https://github.com/user-attachments/assets/5696c001-29c9-4097-92b3-306fd02e76db
 
 - [x] Make conways game of life
