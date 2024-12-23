@@ -1,10 +1,13 @@
 use std::{
     fmt::Debug,
     io::{self, Write},
-    mem, usize,
+    usize,
 };
 
-use crate::{coordination, rendering::colors::TerminalColors, shared::usize2d::Usize2d};
+use crate::{
+    rendering::colors::TerminalColors, shared::usize2d::Usize2d,
+    utils::vec_u8_writer::write_to_location,
+};
 
 use super::handle::Handle;
 
@@ -33,7 +36,16 @@ impl MemoryHandle {
 }
 impl MemoryHandle {
     pub fn get_buffer_content(&mut self) -> Vec<u8> {
-        self.buffer.clone().into_iter().flatten().collect()
+        let mut result: Vec<u8> = Vec::new(); // TODO: could define with capacity here
+
+        for index in 0..self.buffer_temp.len() {
+            result.append(&mut self.buffer_temp[index].clone());
+            if index < self.buffer_temp.len() - 1 {
+                result.push(b'\n');
+            }
+        }
+
+        result
     }
     pub fn need_to_flush(self) -> bool {
         self.buffer_temp.len() > 0
@@ -53,6 +65,14 @@ impl Debug for MemoryHandle {
 impl Write for MemoryHandle {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let vec_to_push = buf.to_vec();
+        while self.buffer_temp.len() <= self.cursor_location.y {
+            self.buffer_temp.push(Vec::new());
+        }
+        self.buffer_temp[self.cursor_location.y] = write_to_location(
+            self.buffer_temp[self.cursor_location.y].clone(),
+            vec_to_push,
+            self.cursor_location.x,
+        );
 
         Ok(buf.len())
     }
