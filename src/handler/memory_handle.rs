@@ -75,8 +75,14 @@ impl Write for MemoryHandle {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let vec_to_push = buf.to_vec();
         let len_to_push = vec_to_push.len();
-        while self.buffer_temp.len() <= self.current_cursor_location.y {
-            self.buffer_temp.push(Vec::new());
+
+        let required_len = self.current_cursor_location.y + 1;
+        if self.buffer_temp.len() < required_len {
+            self.buffer_temp.resize_with(required_len, Vec::new);
+            self.background_color_buffer_temp
+                .resize_with(required_len, Vec::new);
+            self.foreground_color_buffer_temp
+                .resize_with(required_len, Vec::new);
         }
         self.buffer_temp[self.current_cursor_location.y] = write_vec_to_vec(
             self.buffer_temp[self.current_cursor_location.y].clone(),

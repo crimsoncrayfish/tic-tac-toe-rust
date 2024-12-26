@@ -166,7 +166,6 @@ pub fn write_t_to_vec<T: Copy>(
     len: usize,
     default: T,
 ) -> Vec<T> {
-    assert!(len > 0);
     if original.len() <= index {
         let mut new_vec: Vec<T> = original.clone();
         pad_vec(&mut new_vec, index, default);
@@ -181,6 +180,55 @@ pub fn write_t_to_vec<T: Copy>(
         new.extend_from_slice(&original[len + index..]);
     }
     new
+}
+#[cfg(test)]
+mod write_t_to_vec_tests {
+    use crate::utils::vec_t_writer::write_t_to_vec;
+
+    #[test]
+    fn write_u8() {
+        let test_cases = vec![
+            ("Hello", 6_usize, 4_usize, b'P', b'V', "HelloPVVVV"),
+            ("Hello", 2_usize, 1_usize, b'P', b'V', "HeVlo"),
+            ("Hello", 2_usize, 10_usize, b'P', b'V', "HeVVVVVVVVVV"),
+            ("Hello World", 0_usize, 3_usize, b'P', b' ', "   lo World"),
+            ("cat", 5_usize, 4_usize, b' ', b'N', "cat  NNNN"),
+            ("cat", 5_usize, 0_usize, b' ', b'N', "cat  "),
+        ];
+
+        for (i, (original, index, len, padding_value, t_to_write, expected)) in
+            test_cases.iter().enumerate()
+        {
+            let original_vec: Vec<u8> = original.as_bytes().to_vec();
+            let expected_vec: Vec<u8> = expected.as_bytes().to_vec();
+
+            let result: Vec<u8> =
+                write_t_to_vec(original_vec, *t_to_write, *index, *len, *padding_value);
+
+            let result_string = String::from_utf8(result.clone());
+            let expected_string = String::from_utf8(expected_vec.clone());
+
+            assert!(
+                expected_string.is_ok(),
+                "Test case {}: Expected is not valid UTF-8",
+                i
+            );
+            assert!(
+                result_string.is_ok(),
+                "Test case {}: Result is not valid UTF-8",
+                i
+            );
+
+            assert_eq!(
+                result,
+                expected_vec,
+                "Test case {}: Got: {:?}, Expected: {:?}",
+                i,
+                result_string.unwrap(),
+                expected_string.unwrap()
+            );
+        }
+    }
 }
 
 /// Add padding to a Vec<T> with a specified padding value
@@ -217,8 +265,12 @@ mod pad_vec_tests {
     use crate::utils::vec_t_writer::pad_vec;
 
     #[test]
-    fn overwrite() {
-        let test_cases = vec![("Hello ", 6_usize, b' ', "Hello ")];
+    fn pad() {
+        let test_cases = vec![
+            ("Hello", 6_usize, b' ', "Hello "),
+            ("Hello", 3_usize, b' ', "Hello"),
+            ("Hello", 10_usize, b'A', "HelloAAAAA"),
+        ];
 
         for (i, (original, new_len, padding_value, expected)) in test_cases.iter().enumerate() {
             let original_vec: Vec<u8> = original.as_bytes().to_vec();
