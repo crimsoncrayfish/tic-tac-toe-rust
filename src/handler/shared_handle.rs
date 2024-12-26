@@ -61,7 +61,7 @@ impl Display for SharedWriterErr {
 mod tests {
     use std::sync::{Arc, Mutex};
 
-    use crate::writer::memory_handle::MemoryHandle;
+    use crate::handler::memory_handle::MemoryHandle;
 
     use super::SharedHandle;
 

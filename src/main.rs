@@ -5,7 +5,7 @@ use utils::arg_helper::read_config;
 pub mod utils {
     pub mod arg_helper;
     pub mod helper_macros;
-    pub mod vec_u8_writer;
+    pub mod vec_t_writer;
 }
 
 pub mod coordination {
@@ -27,7 +27,7 @@ pub mod shared {
     pub mod frame;
     pub mod usize2d;
 }
-pub mod writer {
+pub mod handler {
     pub mod handle;
     pub mod handle_error;
     pub mod memory_handle;
