@@ -25,6 +25,7 @@ pub mod rendering {
 
 pub mod shared {
     pub mod frame;
+    pub mod square;
     pub mod usize2d;
 }
 pub mod handler {

@@ -42,11 +42,15 @@ impl MemoryHandle {
     }
 }
 impl MemoryHandle {
-    pub fn get_buffer_content(&mut self) -> Vec<u8> {
+    pub fn get_buffer_content(&self) -> Vec<u8> {
+        if self.buffer.len() == 0 {
+            return Vec::new();
+        }
+        assert!(self.buffer.len() > 0);
         let mut result: Vec<u8> = Vec::with_capacity(self.buffer_temp.len() * 2 - 1);
 
         for index in 0..self.buffer_temp.len() {
-            result.append(&mut self.buffer_temp[index].clone());
+            result.extend(self.buffer_temp[index].clone());
             if index < self.buffer_temp.len() - 1 {
                 result.push(b'\n');
             }
