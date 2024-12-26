@@ -1,10 +1,10 @@
 use super::colors::TerminalColors;
 
 pub struct Sprite {
-    name: String,
-    width: usize,
-    height: usize,
-    chars: Vec<Vec<u8>>,
-    background_colors: Vec<Vec<TerminalColors>>,
-    foreground_colors: Vec<Vec<TerminalColors>>,
+    _name: String,
+    _width: usize,
+    _height: usize,
+    _chars: Vec<Vec<u8>>,
+    _background_colors: Vec<Vec<TerminalColors>>,
+    _foreground_colors: Vec<Vec<TerminalColors>>,
 }

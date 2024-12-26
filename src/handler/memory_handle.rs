@@ -43,7 +43,7 @@ impl MemoryHandle {
 }
 impl MemoryHandle {
     pub fn get_buffer_content(&mut self) -> Vec<u8> {
-        let mut result: Vec<u8> = Vec::new(); // TODO: could define with capacity here
+        let mut result: Vec<u8> = Vec::with_capacity(self.buffer_temp.len() * 2 - 1);
 
         for index in 0..self.buffer_temp.len() {
             result.append(&mut self.buffer_temp[index].clone());
@@ -55,7 +55,7 @@ impl MemoryHandle {
         result
     }
     pub fn need_to_flush(self) -> bool {
-        self.buffer_temp.len() > 0
+        self.buffer_temp != self.buffer
     }
 }
 

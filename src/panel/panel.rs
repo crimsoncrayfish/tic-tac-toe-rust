@@ -23,14 +23,14 @@ use super::{command_enum::PanelCommandEnum, errors::PanelException, state::Panel
 /// through a sender in the form of list of renderable sprites `Vec<RenderObject>`
 #[derive(Debug)]
 pub struct Panel {
-    previous_frame: Vec<Vec<Pixel>>,
-    next_frame: Vec<Vec<Pixel>>,
+    _previous_frame: Vec<Vec<Pixel>>,
+    _next_frame: Vec<Vec<Pixel>>,
     top_left: Usize2d,
     bottom_right: Usize2d,
     frame_receiver: Receiver<Vec<RenderObject>>,
     command_receiver: Receiver<PanelCommandEnum>,
     state: PanelState,
-    writer: Box<dyn Handle>,
+    _writer: Box<dyn Handle>,
 }
 impl Panel {
     /// Initialize an instance of Window
@@ -77,14 +77,14 @@ impl Panel {
             PanelException::BadCoordinateException
         );
         Ok(Panel {
-            previous_frame: new_state.clone(),
-            next_frame: new_state.clone(),
+            _previous_frame: new_state.clone(),
+            _next_frame: new_state.clone(),
             top_left,
             bottom_right,
             frame_receiver,
             command_receiver,
             state: PanelState::default(),
-            writer: handle,
+            _writer: handle,
         })
     }
 
@@ -246,8 +246,8 @@ mod tests {
         assert!(window.is_ok());
         let window = window.unwrap();
 
-        assert_eq!(window.previous_frame, vec![vec![Pixel::default(); 10]; 20]);
-        assert_eq!(window.next_frame, vec![vec![Pixel::default(); 10]; 20]);
+        assert_eq!(window._previous_frame, vec![vec![Pixel::default(); 10]; 20]);
+        assert_eq!(window._next_frame, vec![vec![Pixel::default(); 10]; 20]);
     }
 
     #[test]

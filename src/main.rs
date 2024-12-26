@@ -46,11 +46,11 @@ fn main() -> Result<(), SystemException> {
 
 #[derive(Debug)]
 enum SystemException {
-    GameException,
-    InputReaderException,
-    CoordinatorException,
-    RedererException,
-    WindowsException,
+    _GameException,
+    _InputReaderException,
+    _CoordinatorException,
+    _RedererException,
+    _WindowsException,
 }
 
 /// Placeholder
