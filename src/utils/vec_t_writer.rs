@@ -22,10 +22,15 @@ use std::usize;
 ///
 /// ```
 ///
-pub fn write_to_location(original: Vec<u8>, string_to_write: Vec<u8>, index: usize) -> Vec<u8> {
+pub fn write_to_location<T: Copy>(
+    original: Vec<T>,
+    string_to_write: Vec<T>,
+    index: usize,
+    padding: T,
+) -> Vec<T> {
     if original.len() <= index {
-        let mut new_vec: Vec<u8> = original.clone();
-        pad_vec_up_to(&mut new_vec, index);
+        let mut new_vec: Vec<T> = original.clone();
+        pad_vec_up_to(&mut new_vec, index, padding);
         new_vec.extend(string_to_write);
         return new_vec;
     }
@@ -33,19 +38,23 @@ pub fn write_to_location(original: Vec<u8>, string_to_write: Vec<u8>, index: usi
     overwrite_vec_from_index(original.clone(), string_to_write, index)
 }
 
-fn pad_vec_up_to(original: &mut Vec<u8>, length: usize) {
+fn pad_vec_up_to<T: Copy>(original: &mut Vec<T>, length: usize, padding: T) {
     while original.len() < length {
-        original.push(b' ');
+        original.push(padding);
     }
 }
 
-fn overwrite_vec_from_index(original: Vec<u8>, string_to_write: Vec<u8>, index: usize) -> Vec<u8> {
-    let mut new_vec: Vec<u8> = original[0..index].to_vec();
+fn overwrite_vec_from_index<T: Copy>(
+    original: Vec<T>,
+    string_to_write: Vec<T>,
+    index: usize,
+) -> Vec<T> {
+    let mut new_vec: Vec<T> = original[0..index].to_vec();
 
     let added_len = string_to_write.len();
     new_vec.extend(string_to_write);
     if original.len() > (index + added_len) {
-        let end: Vec<u8> = original[index + added_len..original.len()].to_vec();
+        let end: Vec<T> = original[index + added_len..original.len()].to_vec();
 
         new_vec.extend(end);
     }
@@ -54,10 +63,12 @@ fn overwrite_vec_from_index(original: Vec<u8>, string_to_write: Vec<u8>, index: 
 
 #[cfg(test)]
 mod tests {
+    use crate::rendering::colors::TerminalColors;
+
     use super::write_to_location;
 
     #[test]
-    fn write_to_location_scenarios() {
+    fn write_u8_to_location_scenarios() {
         let test_cases = vec![
             ("Hello ", "World", 6, "Hello World"),
             ("Rust", " is great", 4, "Rust is great"),
@@ -74,7 +85,8 @@ mod tests {
             let to_write_vec: Vec<u8> = to_write.as_bytes().to_vec();
             let expected_vec: Vec<u8> = expected.as_bytes().to_vec();
 
-            let result = write_to_location(original_vec.clone(), to_write_vec.clone(), *location);
+            let result =
+                write_to_location(original_vec.clone(), to_write_vec.clone(), *location, b' ');
 
             let result_string = String::from_utf8(result.clone());
             let expected_string = String::from_utf8(expected_vec.clone());
@@ -97,6 +109,46 @@ mod tests {
                 i,
                 result_string.unwrap(),
                 expected_string.unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn write_enum_to_location_scenarios() {
+        let default = TerminalColors::Black;
+        let test_cases = vec![
+            (
+                vec![TerminalColors::Red, TerminalColors::Black],
+                vec![TerminalColors::HotPink],
+                4,
+                vec![
+                    TerminalColors::Red,
+                    TerminalColors::Black,
+                    default.clone(),
+                    default.clone(),
+                    TerminalColors::HotPink,
+                ],
+            ),
+            (
+                vec![TerminalColors::Red, TerminalColors::Black],
+                vec![TerminalColors::HotPink],
+                1,
+                vec![TerminalColors::Red, TerminalColors::HotPink],
+            ),
+        ];
+
+        for (i, (original, to_write, location, expected)) in test_cases.iter().enumerate() {
+            let result = write_to_location(
+                original.clone(),
+                to_write.clone(),
+                *location,
+                default.clone(),
+            );
+
+            assert_eq!(
+                &result, expected,
+                "Test case {}: Got: {:?}, Expected: {:?}",
+                i, result, expected
             );
         }
     }

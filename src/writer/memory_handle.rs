@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     rendering::colors::TerminalColors, shared::usize2d::Usize2d,
-    utils::vec_u8_writer::write_to_location,
+    utils::vec_t_writer::write_to_location,
 };
 
 use super::handle::Handle;
@@ -72,6 +72,7 @@ impl Write for MemoryHandle {
             self.buffer_temp[self.cursor_location.y].clone(),
             vec_to_push,
             self.cursor_location.x,
+            b' ',
         );
 
         Ok(buf.len())
