@@ -5,20 +5,25 @@ use std::{
 };
 
 use crate::{
-    rendering::colors::TerminalColors, shared::usize2d::Usize2d,
-    utils::vec_t_writer::write_to_location,
+    rendering::colors::TerminalColors,
+    shared::usize2d::Usize2d,
+    utils::vec_t_writer::{write_t_to_vec, write_vec_to_vec},
 };
 
 use super::handle::Handle;
 
+/// The behavior of `MemoryHandle` shoudld be as similar to the `StdOut` behaviour as possible.
+/// It is used for unit/simulation testing
 pub struct MemoryHandle {
     pub buffer: Vec<Vec<u8>>,
     buffer_temp: Vec<Vec<u8>>,
-    foreground_color_buffer: Vec<TerminalColors>,
-    foreground_color_buffer_temp: Vec<TerminalColors>,
-    background_color_buffer: Vec<TerminalColors>,
-    background_color_buffer_temp: Vec<TerminalColors>,
-    cursor_location: Usize2d,
+    foreground_color_buffer: Vec<Vec<TerminalColors>>,
+    foreground_color_buffer_temp: Vec<Vec<TerminalColors>>,
+    background_color_buffer: Vec<Vec<TerminalColors>>,
+    background_color_buffer_temp: Vec<Vec<TerminalColors>>,
+    current_cursor_location: Usize2d,
+    current_background_color: TerminalColors,
+    current_foreground_color: TerminalColors,
 }
 
 impl MemoryHandle {
@@ -30,7 +35,9 @@ impl MemoryHandle {
             foreground_color_buffer_temp: Vec::new(),
             background_color_buffer: Vec::new(),
             background_color_buffer_temp: Vec::new(),
-            cursor_location: Usize2d::default(),
+            current_cursor_location: Usize2d::default(),
+            current_background_color: TerminalColors::default(),
+            current_foreground_color: TerminalColors::default(),
         }
     }
 }
@@ -56,8 +63,10 @@ impl Debug for MemoryHandle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "[MemoryHandle {{ cursor_location: {}, buffer_size: {} }}]",
-            self.cursor_location,
+            "[MemoryHandle {{ cursor_location: {}, background_color: {}, foreground_color: {}, buffer_size: {} }}]",
+            self.current_cursor_location,
+            self.current_background_color,
+            self.current_foreground_color,
             self.buffer.iter().map(|s| s.len()).sum::<usize>()
         )
     }
@@ -65,14 +74,31 @@ impl Debug for MemoryHandle {
 impl Write for MemoryHandle {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let vec_to_push = buf.to_vec();
-        while self.buffer_temp.len() <= self.cursor_location.y {
+        let len_to_push = vec_to_push.len();
+        while self.buffer_temp.len() <= self.current_cursor_location.y {
             self.buffer_temp.push(Vec::new());
         }
-        self.buffer_temp[self.cursor_location.y] = write_to_location(
-            self.buffer_temp[self.cursor_location.y].clone(),
+        self.buffer_temp[self.current_cursor_location.y] = write_vec_to_vec(
+            self.buffer_temp[self.current_cursor_location.y].clone(),
             vec_to_push,
-            self.cursor_location.x,
+            self.current_cursor_location.x,
             b' ',
+        );
+
+        self.background_color_buffer_temp[self.current_cursor_location.y] = write_t_to_vec(
+            self.background_color_buffer_temp[self.current_cursor_location.y].clone(),
+            self.current_background_color,
+            len_to_push,
+            self.current_cursor_location.x,
+            TerminalColors::default(),
+        );
+
+        self.foreground_color_buffer_temp[self.current_cursor_location.y] = write_t_to_vec(
+            self.foreground_color_buffer_temp[self.current_cursor_location.y].clone(),
+            self.current_foreground_color,
+            len_to_push,
+            self.current_cursor_location.x,
+            TerminalColors::default(),
         );
 
         Ok(buf.len())
@@ -101,21 +127,21 @@ impl Handle for MemoryHandle {
         &mut self,
         coordinate: Usize2d,
     ) -> Result<(), super::handle_error::HandleError> {
-        self.cursor_location = coordinate;
+        self.current_cursor_location = coordinate;
         Ok(())
     }
     fn set_foreground_color(
         &mut self,
         color: TerminalColors,
     ) -> Result<(), super::handle_error::HandleError> {
-        self.foreground_color_buffer.push(color);
+        self.current_foreground_color = color;
         Ok(())
     }
     fn set_background_color(
         &mut self,
         color: TerminalColors,
     ) -> Result<(), super::handle_error::HandleError> {
-        self.background_color_buffer.push(color);
+        self.current_background_color = color;
         Ok(())
     }
 }
@@ -125,8 +151,8 @@ mod tests {
     use std::io::Write;
 
     use crate::{
+        handler::{handle::Handle, memory_handle::MemoryHandle},
         shared::usize2d::Usize2d,
-        writer::{handle::Handle, memory_handle::MemoryHandle},
     };
 
     #[test]

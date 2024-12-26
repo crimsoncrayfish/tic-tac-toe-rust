@@ -5,9 +5,9 @@ use std::{
 
 use crate::{
     assert_r,
+    handler::handle::Handle,
     rendering::render_object::RenderObject,
     shared::{frame::Pixel, usize2d::Usize2d},
-    writer::handle::Handle,
 };
 
 use super::{command_enum::PanelCommandEnum, errors::PanelException, state::PanelState};
@@ -219,9 +219,9 @@ mod tests {
     use std::{sync::mpsc::channel, thread::sleep, time::Duration};
 
     use crate::{
+        handler::memory_handle::MemoryHandle,
         panel::{command_enum::PanelCommandEnum, errors::PanelException},
         shared::{frame::Pixel, usize2d::Usize2d},
-        writer::memory_handle::MemoryHandle,
     };
 
     use super::Panel;

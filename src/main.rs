@@ -27,7 +27,7 @@ pub mod shared {
     pub mod frame;
     pub mod usize2d;
 }
-pub mod writer {
+pub mod handler {
     pub mod handle;
     pub mod handle_error;
     pub mod memory_handle;

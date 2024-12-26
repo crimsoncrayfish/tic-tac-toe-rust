@@ -1,16 +1,17 @@
 use std::usize;
 
-/// Write to an existing `Vec<u8>` with a new `Vec<u8>`
+/// Write to an existing `Vec<T>` with a new `Vec<T>` where T is the type
 ///
 /// # Arguments
 ///
-/// * `original` - a `Vec<u8>` that needs to be updated
-/// * `string_to_write` - a `Vec<u8>` that needs to be inserted
+/// * `original` - a `Vec<T>` that needs to be updated
+/// * `string_to_write` - a `Vec<T>` that needs to be inserted
 /// * `index` - the starting index where the new string needs to be written to
+/// * `default` - the value used to pad the vec when writing to a new location
 ///
 /// # Returns
 ///
-/// A new `Vec<u8>` e.g.
+/// A new `Vec<T>` e.g.
 /// 'the original', 'new string', 4 => 'the new string'
 ///
 /// # Examples
@@ -18,54 +19,35 @@ use std::usize;
 /// ```
 /// let original_vec: Vec<u8> = "original".as_bytes().to_vec();
 /// let to_write_vec: Vec<u8> = "new string".as_bytes().to_vec();
-/// let result = write_to_location(original_vec.clone(), to_write_vec.clone(), 4);
-///
+/// let result = write_to_location(original_vec.clone(), to_write_vec.clone(), 4, b' ');
+/// assert_eq!(result, "orignew string".as_bytes().to_vec());
 /// ```
 ///
-pub fn write_to_location<T: Copy>(
+pub fn write_vec_to_vec<T: Copy>(
     original: Vec<T>,
-    string_to_write: Vec<T>,
+    vec_to_write: Vec<T>,
     index: usize,
-    padding: T,
+    default: T,
 ) -> Vec<T> {
+    let mut new_vec: Vec<T> = Vec::with_capacity(original.len().max(index + vec_to_write.len()));
     if original.len() <= index {
-        let mut new_vec: Vec<T> = original.clone();
-        pad_vec_up_to(&mut new_vec, index, padding);
-        new_vec.extend(string_to_write);
+        new_vec.extend(original);
+        pad_vec(&mut new_vec, index, default);
+        new_vec.extend(vec_to_write);
         return new_vec;
     }
-
-    overwrite_vec_from_index(original.clone(), string_to_write, index)
-}
-
-fn pad_vec_up_to<T: Copy>(original: &mut Vec<T>, length: usize, padding: T) {
-    while original.len() < length {
-        original.push(padding);
-    }
-}
-
-fn overwrite_vec_from_index<T: Copy>(
-    original: Vec<T>,
-    string_to_write: Vec<T>,
-    index: usize,
-) -> Vec<T> {
-    let mut new_vec: Vec<T> = original[0..index].to_vec();
-
-    let added_len = string_to_write.len();
-    new_vec.extend(string_to_write);
-    if original.len() > (index + added_len) {
-        let end: Vec<T> = original[index + added_len..original.len()].to_vec();
-
-        new_vec.extend(end);
+    new_vec.extend_from_slice(&original[0..index]);
+    let written_len = vec_to_write.len();
+    new_vec.extend(vec_to_write);
+    if original.len() > (index + written_len) {
+        new_vec.extend_from_slice(&original[index + written_len..]);
     }
     new_vec
 }
 
 #[cfg(test)]
-mod tests {
-    use crate::rendering::colors::TerminalColors;
-
-    use super::write_to_location;
+mod write_vec_to_vec_tests {
+    use crate::{rendering::colors::TerminalColors, utils::vec_t_writer::write_vec_to_vec};
 
     #[test]
     fn write_u8_to_location_scenarios() {
@@ -86,7 +68,7 @@ mod tests {
             let expected_vec: Vec<u8> = expected.as_bytes().to_vec();
 
             let result =
-                write_to_location(original_vec.clone(), to_write_vec.clone(), *location, b' ');
+                write_vec_to_vec(original_vec.clone(), to_write_vec.clone(), *location, b' ');
 
             let result_string = String::from_utf8(result.clone());
             let expected_string = String::from_utf8(expected_vec.clone());
@@ -138,7 +120,7 @@ mod tests {
         ];
 
         for (i, (original, to_write, location, expected)) in test_cases.iter().enumerate() {
-            let result = write_to_location(
+            let result = write_vec_to_vec(
                 original.clone(),
                 to_write.clone(),
                 *location,
@@ -149,6 +131,123 @@ mod tests {
                 &result, expected,
                 "Test case {}: Got: {:?}, Expected: {:?}",
                 i, result, expected
+            );
+        }
+    }
+}
+/// Write to an existing `Vec<T>` with a new `Vec<u8>`
+///
+/// # Arguments
+///
+/// * `original` - a `Vec<T>` that needs to be updated
+/// * `t_to_write` - a value `T` that needs to be inserted
+/// * `index` - the starting index where the new value needs to be written to
+/// * `len` - the number of instances of the value that needs to be written
+/// * `default` - the value used to pad the vec when writing to a new location
+///
+/// # Returns
+///
+/// A new `Vec<u8>` e.g.
+/// 'the original', b'A', 4, 2, b' ' => 'the AAw string'
+///
+/// # Examples
+///
+/// ```
+/// let original_vec: Vec<u8> = "original string".as_bytes().to_vec();
+/// let to_write: u8 = b"A";
+/// let result = write_t_to_vec(original_vec.clone(), to_write, 4,2, b' ');
+/// assert_eq!(result, "origAA string".as_bytes().to_vec());
+///
+/// ```
+pub fn write_t_to_vec<T: Copy>(
+    original: Vec<T>,
+    t_to_write: T,
+    index: usize,
+    len: usize,
+    default: T,
+) -> Vec<T> {
+    assert!(len > 0);
+    if original.len() <= index {
+        let mut new_vec: Vec<T> = original.clone();
+        pad_vec(&mut new_vec, index, default);
+        pad_vec(&mut new_vec, len + index, t_to_write);
+        return new_vec;
+    }
+
+    let mut new: Vec<T> = Vec::with_capacity(original.len().max(index + len));
+    new.extend_from_slice(&original[0..index]);
+    new.extend(std::iter::repeat(t_to_write).take(len));
+    if original.len() > len + index {
+        new.extend_from_slice(&original[len + index..]);
+    }
+    new
+}
+
+/// Add padding to a Vec<T> with a specified padding value
+///
+/// # Arguments
+///
+/// * `original` - a `Vec<T>` that needs to be updated
+/// * `len` - the length that the Vec<T> should be after padding
+/// * `default` - the value that should be added in the new entries
+///
+/// # Returns
+///
+/// This function modifies the existing Vec<T>
+/// 'original', b'A', 10 => 'originalAA'
+///
+/// # Examples
+///
+/// ```
+/// let original_vec: Vec<u8> = "original string".as_bytes().to_vec();
+/// let to_write: u8 = b"A";
+/// pad_vec(original_vec, 20, to_write);
+/// assert_eq!(original_vec, "original stringAAAAA".as_bytes().to_vec());
+///
+/// ```
+pub fn pad_vec<T: Copy>(original: &mut Vec<T>, len: usize, default: T) {
+    if len < original.len() {
+        return;
+    }
+    original.extend(std::iter::repeat(default).take(len - original.len()));
+}
+
+#[cfg(test)]
+mod pad_vec_tests {
+    use crate::utils::vec_t_writer::pad_vec;
+
+    #[test]
+    fn overwrite() {
+        let test_cases = vec![("Hello ", 6_usize, b' ', "Hello ")];
+
+        for (i, (original, new_len, padding_value, expected)) in test_cases.iter().enumerate() {
+            let original_vec: Vec<u8> = original.as_bytes().to_vec();
+            let expected_vec: Vec<u8> = expected.as_bytes().to_vec();
+
+            let mut result = original_vec.clone();
+            pad_vec(&mut result, *new_len, *padding_value);
+
+            let result_string = String::from_utf8(result.clone());
+            let expected_string = String::from_utf8(expected_vec.clone());
+
+            assert!(
+                expected_string.is_ok(),
+                "Test case {}: Expected is not valid UTF-8",
+                i
+            );
+            assert!(
+                result_string.is_ok(),
+                "Test case {}: Result is not valid UTF-8",
+                i
+            );
+
+            assert_eq!(
+                result,
+                expected_vec,
+                "Test case {}: Got: {:?}, Expected: {:?}",
+                i,
+                result_string.unwrap(),
+                expected_string.unwrap()
             );
         }
     }
