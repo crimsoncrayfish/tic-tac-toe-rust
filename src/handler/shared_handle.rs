@@ -1,10 +1,13 @@
 use std::{
+    error::Error,
     fmt::Display,
+    io::{self, Write},
     sync::{Arc, Mutex},
 };
 
-use super::{handle::Handle, std_io_handle::StdIOHandle};
+use super::{handle::Handle, handle_error::HandleError, std_io_handle::StdIOHandle};
 
+#[derive(Debug)]
 pub struct SharedHandle {
     handle: Arc<Mutex<dyn Handle>>,
 }
@@ -44,10 +47,78 @@ impl SharedHandle {
         Ok(())
     }
 }
+impl Write for SharedHandle {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let mut locked_writer = self
+            .handle
+            .lock()
+            .map_err(|_| SharedWriterErr::FailedToLock)?;
+        locked_writer.write(buf)
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        let mut locked_writer = self
+            .handle
+            .lock()
+            .map_err(|_| SharedWriterErr::FailedToLock)?;
+        locked_writer.flush()
+    }
+    fn write_fmt(&mut self, fmt: std::fmt::Arguments<'_>) -> io::Result<()> {
+        let mut locked_writer = self
+            .handle
+            .lock()
+            .map_err(|_| SharedWriterErr::FailedToLock)?;
+        locked_writer.write_fmt(fmt)
+    }
+}
+impl Handle for SharedHandle {
+    fn set_cursor_location(
+        &mut self,
+        coord: crate::shared::usize2d::Usize2d,
+    ) -> Result<(), super::handle_error::HandleError> {
+        let mut locked_writer = self
+            .handle
+            .lock()
+            .map_err(|_| SharedWriterErr::FailedToLock)?;
+        locked_writer.set_cursor_location(coord)
+    }
+    fn set_foreground_color(
+        &mut self,
+        color: crate::rendering::colors::TerminalColors,
+    ) -> Result<(), super::handle_error::HandleError> {
+        let mut locked_writer = self
+            .handle
+            .lock()
+            .map_err(|_| SharedWriterErr::FailedToLock)?;
+        locked_writer.set_foreground_color(color)
+    }
+    fn set_background_color(
+        &mut self,
+        color: crate::rendering::colors::TerminalColors,
+    ) -> Result<(), super::handle_error::HandleError> {
+        let mut locked_writer = self
+            .handle
+            .lock()
+            .map_err(|_| SharedWriterErr::FailedToLock)?;
+        locked_writer.set_background_color(color)
+    }
+}
 
 #[derive(Debug)]
 pub enum SharedWriterErr {
     FailedToLock,
+}
+impl Error for SharedWriterErr {}
+impl From<SharedWriterErr> for io::Error {
+    fn from(err: SharedWriterErr) -> io::Error {
+        io::Error::new(io::ErrorKind::Other, err)
+    }
+}
+impl From<SharedWriterErr> for HandleError {
+    fn from(err: SharedWriterErr) -> HandleError {
+        match err {
+            SharedWriterErr::FailedToLock => HandleError::LockFailed,
+        }
+    }
 }
 impl Display for SharedWriterErr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

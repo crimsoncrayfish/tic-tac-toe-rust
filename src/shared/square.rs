@@ -1,8 +1,33 @@
 use std::fmt::Display;
 
-use super::usize2d::Usize2d;
+use crate::assert_r;
+
+use super::{shared_errors::SharedErrors, usize2d::Usize2d};
 
 #[derive(Clone, Default, Debug)]
+/// A struct representing a rectancle in space
+///
+/// The smallest the rectangle can be is 1x1 if the `top_left` and `bottom_right` coordinates are
+/// the same
+///
+/// # Example
+///
+/// ```
+/// let sqr = Square::new(Usize2d::new(1,1), Usize2d::new(3,4));
+/// ```
+/// O O O O O
+/// O X X X O
+/// O X X X O
+/// O X X X O
+/// O X X X O
+/// O O O O O
+///
+/// The above square starts at the top left corner with coordinate 1,1 and ends at coordinate (3,4)
+///
+/// (1,1) (2,1) (3,1) (4,1)...
+/// (1,2) (2,2) (3,2) (4,2)...
+/// (1,3) (2,3) (3,3) (4,3)...
+/// ...
 pub struct Square {
     top_left: Usize2d,
     bottom_right: Usize2d,
@@ -27,11 +52,13 @@ impl Square {
     ///
     /// let square= Square::new(top_left, bottom_right);
     /// ```
-    pub fn new(top_left: Usize2d, bottom_right: Usize2d) -> Self {
-        Square {
+    pub fn new(top_left: Usize2d, bottom_right: Usize2d) -> Result<Self, SharedErrors> {
+        assert_r!(top_left.x <= bottom_right.x, SharedErrors::BadCoordinate);
+        assert_r!(top_left.y <= bottom_right.y, SharedErrors::BadCoordinate);
+        Ok(Square {
             top_left,
             bottom_right,
-        }
+        })
     }
 
     /// Test if a coordinate is inside the square
@@ -59,6 +86,42 @@ impl Square {
             && coordinate.x <= self.bottom_right.x
             && coordinate.y >= self.top_left.y
             && coordinate.y <= self.bottom_right.y
+    }
+    /// Get the width of the square
+    ///
+    /// # Returns
+    /// a `usize` indicating the width of the square
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let top_left= Usize2d::new(0, 0);
+    /// let bottom_right= Usize2d::new(10, 69);
+    /// let square= Square::new(top_left, bottom_right);
+    ///
+    /// let width = square.width();
+    /// assert!(width == 11);
+    /// ```
+    pub fn width(&self) -> usize {
+        self.bottom_right.x - self.top_left.x + 1
+    }
+    /// Get the height of the square
+    ///
+    /// # Returns
+    /// a `usize` indicating the height of the square
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let top_left= Usize2d::new(0, 0);
+    /// let bottom_right= Usize2d::new(10, 69);
+    /// let square= Square::new(top_left, bottom_right);
+    ///
+    /// let height = square.height();
+    /// assert!(height == 70);
+    /// ```
+    pub fn height(&self) -> usize {
+        self.bottom_right.y - self.top_left.y + 1
     }
 }
 
@@ -117,5 +180,48 @@ pub mod test {
                 i, result, expected_result, square, coordinate
             );
         }
+    }
+    #[test]
+    fn height_and_width() {
+        let expected_width = 15;
+        let expected_height = 18;
+        let result = Square::new(Usize2d::new(3, 4), Usize2d::new(17, 21));
+        assert!(result.is_ok());
+        let square = result.unwrap();
+
+        let actual_width = square.width();
+        let actual_height = square.height();
+        assert!(
+            expected_width == actual_width,
+            "Width was wrong. Expected: {}, Got: {}, Math: {} - {} + 1",
+            expected_width,
+            actual_width,
+            square.bottom_right.x,
+            square.top_left.x,
+        );
+        assert!(
+            expected_height == actual_height,
+            "Height was wrong. Expected: {}, Got: {}, Math: {} - {} + 1",
+            expected_height,
+            actual_height,
+            square.bottom_right.y,
+            square.top_left.y,
+        );
+    }
+
+    #[test]
+    fn init_fail_left_gt_right() {
+        let top_left = Usize2d::new(1003, 4);
+        let bottom_right = Usize2d::new(17, 21);
+        let result = Square::new(top_left.clone(), bottom_right.clone());
+        assert!(result.is_err(), "The left most coordinate ({}), cannot be more to the right than the right most coordinate ({})",top_left.x, bottom_right.x);
+    }
+
+    #[test]
+    fn init_fail_top_gt_bottom() {
+        let top_left = Usize2d::new(2, 20204);
+        let bottom_right = Usize2d::new(17, 21);
+        let result = Square::new(top_left.clone(), bottom_right.clone());
+        assert!(result.is_err(), "The top most coordinate ({}), cannot be more to the bottom than the bottom most coordinate ({})",top_left.y, bottom_right.y);
     }
 }
