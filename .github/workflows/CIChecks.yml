@@ -74,7 +74,7 @@ jobs:
     - name: Post Coverage to PR
       if: github.event_name == 'pull_request'
       run: |
-        BODY= core.getInput('coverage_summary');
+        BODY="${{ steps.coverage_summary.outputs.coverage_summary }}"
         PR_NUMBER=${{ github.event.pull_request.number }}
         REPO=${{ github.repository }}
         RESPONSE=$(curl -L \
