@@ -37,22 +37,22 @@ jobs:
         if [[ -f "$FILE" ]]; then
           lines_count=$(jq -r '.data[0].totals.lines.count' "$FILE")
           lines_covered=$(jq -r '.data[0].totals.lines.covered' "$FILE")
-          lines_percent=$(jq -r '.data[0].totals.lines.percent' "$FILE")
 
           functions_count=$(jq -r '.data[0].totals.functions.count' "$FILE")
           functions_covered=$(jq -r '.data[0].totals.functions.covered' "$FILE")
-          functions_percent=$(jq -r '.data[0].totals.functions.percent' "$FILE")
     
           regions_count=$(jq -r '.data[0].totals.regions.count' "$FILE")
           regions_covered=$(jq -r '.data[0].totals.regions.covered' "$FILE")
-          regions_percent=$(jq -r '.data[0].totals.regions.percent' "$FILE")
     
           instantiations_count=$(jq -r '.data[0].totals.instantiations.count' "$FILE")
           instantiations_covered=$(jq -r '.data[0].totals.instantiations.covered' "$FILE")
-          instantiations_percent=$(jq -r '.data[0].totals.instantiations.percent' "$FILE")
     
-          branches_percent=$(jq -r '.data[0].totals.branches.percent' "$FILE")
-          mcdc_percent=$(jq -r '.data[0].totals.mcdc.percent' "$FILE")
+          lines_percent=$(printf "%.2f" $(jq -r '.data[0].totals.lines.percent' "$FILE"))
+          functions_percent=$(printf "%.2f" $(jq -r '.data[0].totals.functions.percent' "$FILE"))
+          regions_percent=$(printf "%.2f" $(jq -r '.data[0].totals.regions.percent' "$FILE"))
+          instantiations_percent=$(printf "%.2f" $(jq -r '.data[0].totals.instantiations.percent' "$FILE"))
+          branches_percent=$(printf "%.2f" $(jq -r '.data[0].totals.branches.percent' "$FILE"))
+          mcdc_percent=$(printf "%.2f" $(jq -r '.data[0].totals.mcdc.percent' "$FILE"))
     
           # Build the summary string
           summary="**Coverage Report Summary:**\\n"
