@@ -43,18 +43,13 @@ jobs:
           branches=$(jq -r '.data[0].totals.branches' "$FILE")
           mcdc=$(jq -r '.data[0].totals.mcdc' "$FILE")
         
-          summary=$(
-            cat <<-EOF
-            Coverage Report Summary:
-            - Total Lines: ${lines.count}, Covered: ${lines.covered} (${lines.percent}% coverage).
-            - Total Functions: ${functions.count}, Covered: ${functions.covered} (${functions.percent}% coverage).
-            - Total Regions: ${regions.count}, Covered: ${regions.covered} (${regions.percent}% coverage).
-            - Total Instantiations: ${instantiations.count}, Covered: ${instantiations.covered} (${instantiations.percent}% coverage).
-            - Branch Coverage: ${branches.percent}% (0 branches counted).
-            - MC/DC Coverage: ${mcdc.percent}% (0 conditions counted).
-            EOF
-          )
-  
+          $summary="**Coverage Report Summary:**\\nTotal Tests: ${{ env.total }}\\nPassed: ${{ env.passed }}\\nFailed: ${{ env.failed }}\\n"
+            +"- Total Lines: ${{lines.count}}, Covered: ${{lines.covered}} (${{lines.percent}}% coverage)."
+            +"- Total Functions: ${{functions.count}, Covered: ${{functions.covered}} (${{functions.percent}}% coverage)."
+            +"- Total Regions: ${{regions.count}}, Covered: ${{regions.covered}} (${{regions.percent}}% coverage)."
+            +"- Total Instantiations: ${{instantiations.count}}, Covered: ${{instantiations.covered}} (${{instantiations.percent}}% coverage)."
+
+
           echo "$summary"
           echo "::set-output name=coverage_summary::$summary"
         else
