@@ -1,6 +1,9 @@
-use std::{fmt::Debug, io::Write};
+use std::{fmt::Debug, io::Write, usize};
 
-use crate::{rendering::colors::TerminalColors, shared::usize2d::Usize2d};
+use crate::{
+    rendering::colors::TerminalColors,
+    shared::usize2d::{Coord, Usize2d},
+};
 
 use super::handle_error::HandleError;
 
@@ -53,4 +56,21 @@ pub trait Handle: Write + Send + Debug {
     /// my_handle.set_background_color(TerminalColors::Blue);
     /// ```
     fn set_background_color(&mut self, color: TerminalColors) -> Result<(), HandleError>;
+    /// Write to a specific location
+    ///
+    /// # Arguments
+    ///
+    /// * `buf` - The content to be written as a `buf: &[u8]`
+    /// * `coordinate` - The location to where the content should be written to
+    ///
+    /// # Returns
+    /// The result object indicating if the write was successfull with any error that could have
+    /// occurred
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// my_handle.write_to_location(b"test", Coord::new(10,10));
+    /// ```
+    fn write_to_location(&mut self, buf: &[u8], coord: Coord) -> Result<usize, HandleError>;
 }

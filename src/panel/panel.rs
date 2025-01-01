@@ -6,10 +6,10 @@ use std::{
 use crate::{
     handler::handle::Handle,
     rendering::render_object::RenderObject,
-    shared::{frame::Pixel, square::Square},
+    shared::{frame::Pixel, square::Square, usize2d::Usize2d},
 };
 
-use super::{command_enum::PanelCommandEnum, errors::PanelException, state::PanelState};
+use super::{command_enum::PanelCommandEnum, errors::PanelError, state::PanelState};
 
 /// # Description
 ///
@@ -24,11 +24,11 @@ use super::{command_enum::PanelCommandEnum, errors::PanelException, state::Panel
 pub struct Panel {
     _previous_frame: Vec<Vec<Pixel>>,
     _next_frame: Vec<Vec<Pixel>>,
-    _area: Square,
+    area: Square,
     frame_receiver: Receiver<Vec<RenderObject>>,
     command_receiver: Receiver<PanelCommandEnum>,
     state: PanelState,
-    _handle: Box<dyn Handle>,
+    handle: Box<dyn Handle>,
 }
 impl Panel {
     /// Initialize an instance of Window
@@ -62,16 +62,16 @@ impl Panel {
         frame_receiver: Receiver<Vec<RenderObject>>,
         command_receiver: Receiver<PanelCommandEnum>,
         handle: Box<dyn Handle>,
-    ) -> Result<Self, PanelException> {
+    ) -> Result<Self, PanelError> {
         let new_state = vec![vec![Pixel::default(); area.width()]; area.height()];
         Ok(Panel {
             _previous_frame: new_state.clone(),
             _next_frame: new_state.clone(),
-            _area: area,
+            area,
             frame_receiver,
             command_receiver,
             state: PanelState::default(),
-            _handle: handle,
+            handle,
         })
     }
 
@@ -83,7 +83,7 @@ impl Panel {
     /// let window= Window::init(...);
     /// window.run();
     /// ```
-    pub fn run(&mut self) -> Result<(), PanelException> {
+    pub fn run(&mut self) -> Result<(), PanelError> {
         loop {
             match self.command_receiver.try_recv() {
                 Ok(cmd) => self.state.process_command(cmd),
@@ -125,10 +125,7 @@ impl Panel {
     /// ];
     /// window.process_frame(render_objects);
     /// ```
-    pub fn process_frame(
-        &mut self,
-        _render_objects: Vec<RenderObject>,
-    ) -> Result<(), PanelException> {
+    pub fn process_frame(&mut self, _render_objects: Vec<RenderObject>) -> Result<(), PanelError> {
         // TODO: write the objects to the panel
         Ok(())
     }
@@ -166,7 +163,7 @@ impl Panel {
         frame_receiver: Receiver<Vec<RenderObject>>,
         command_receiver: Receiver<PanelCommandEnum>,
         handle: Box<dyn Handle>,
-    ) -> Result<JoinHandle<()>, PanelException> {
+    ) -> Result<JoinHandle<()>, PanelError> {
         let mut w = Panel::init(area, frame_receiver, command_receiver, handle)?;
         let window_closure = move || {
             let _ = w.run();
@@ -191,8 +188,37 @@ impl Panel {
     /// assert!(result.is_ok());
     ///
     /// ```
-    fn write_object(self, _render_object: RenderObject) -> Result<(), PanelException> {
-        Ok(())
+    fn write_object(mut self, render_object: RenderObject) -> Result<bool, PanelError> {
+        if !self.area.overlaps_with(&render_object.get_area()) {
+            println!(
+                "No overlap for object with coord: {}",
+                render_object.get_location()
+            );
+            println!("Panel area: {}", self.area);
+            println!("Object area: {}", render_object.get_area());
+            return Err(PanelError::OutOfBounds);
+        }
+        let to_write: Vec<Vec<u8>> = match render_object.get_content_to_write(self.area.clone()) {
+            Ok(w) => w,
+            Err(_) => return Ok(false),
+        };
+
+        for index in 0..to_write.len() {
+            let _ = self
+                .handle
+                .set_cursor_location(render_object.get_location() + Usize2d::new(0, index))
+                .map_err(|_| PanelError::WriteLocationFailed)?;
+
+            // TODO: Switch colors
+            println!("Coordinate: {}", render_object.get_location());
+            let _ = self
+                .handle
+                .write(&to_write[index])
+                .map_err(|_| PanelError::WriteFailed)?;
+        }
+        let _ = self.handle.flush();
+
+        Ok(true)
     }
 }
 
@@ -206,7 +232,7 @@ mod tests {
 
     use crate::{
         handler::{memory_handle::MemoryHandle, shared_handle::SharedHandle},
-        panel::{command_enum::PanelCommandEnum, errors::PanelException},
+        panel::command_enum::PanelCommandEnum,
         rendering::{render_object::RenderObject, sprite::Sprite},
         shared::{
             frame::Pixel,
@@ -221,8 +247,7 @@ mod tests {
     fn init() {
         let top_left = Usize2d::new(0, 0);
         let bottom_right = Usize2d::new(10, 20);
-        let result = Square::new(top_left, bottom_right);
-        let square = result.unwrap();
+        let square = Square::new(top_left, bottom_right);
         let handle = Box::new(MemoryHandle::new());
         let (_, frame_receiver) = channel();
         let (_, command_receiver) = channel();
@@ -252,8 +277,7 @@ mod tests {
     fn run_and_kill() {
         let top_left = Usize2d::new(0, 0);
         let bottom_right = Usize2d::new(10, 20);
-        let result = Square::new(top_left, bottom_right);
-        let square = result.unwrap();
+        let square = Square::new(top_left, bottom_right);
 
         let handle = Box::new(MemoryHandle::new());
         let (_, frame_receiver) = channel();
@@ -276,8 +300,7 @@ mod tests {
     fn run_and_write() {
         let top_left = Usize2d::new(0, 0);
         let bottom_right = Usize2d::new(10, 20);
-        let result = Square::new(top_left, bottom_right);
-        let square = result.unwrap();
+        let square = Square::new(top_left, bottom_right);
 
         let handle = Box::new(MemoryHandle::new());
         let (_frame_sender, frame_receiver) = channel();
@@ -299,32 +322,48 @@ mod tests {
         );
     }
     #[test]
-    pub fn write_object() {
-        let top_left = Usize2d::new(3, 4);
-        let bottom_right = Usize2d::new(13, 8);
-        let result = Square::new(top_left, bottom_right);
-        let square = result.unwrap();
-        let mem_handle = Arc::new(Mutex::new(MemoryHandle::new()));
+    fn write_object() {
+        let test_cases = vec![
+            (
+                1,
+                Usize2d::default(),
+                Usize2d::new(100, 100),
+                Coord::new(10, 6),
+                "\n\n\n\n\n\n          X X\n           X \n          X X",
+            ),
+            (
+                2,
+                Usize2d::new(3, 5),
+                Usize2d::new(10, 10),
+                Coord::new(9, 6),
+                "\n\n\n\n\n\n         X \n          X\n         X ",
+            ),
+        ];
 
-        let handle = SharedHandle::init(mem_handle.clone());
-        let (_frame_sender, frame_receiver) = channel();
-        let (_, command_receiver) = channel();
+        for (i, top_left, bottom_right, object_coordinate, expected) in test_cases {
+            let square = Square::new(top_left, bottom_right);
+            let mem_handle = Arc::new(Mutex::new(MemoryHandle::new()));
 
-        let panel = Panel::init(square, frame_receiver, command_receiver, Box::new(handle))
-            .expect("Failed to init the panel");
+            let handle = SharedHandle::init(mem_handle.clone());
+            let (_frame_sender, frame_receiver) = channel();
+            let (_, command_receiver) = channel();
 
-        let obj = RenderObject::new(Sprite::default(), Coord::new(10, 6));
-        let _ = panel
-            .write_object(obj)
-            .expect("Failed to write object to handle");
+            let panel = Panel::init(square, frame_receiver, command_receiver, Box::new(handle))
+                .expect("Failed to init the panel");
 
-        let actual_string = get_shared_mem_handle_content(mem_handle.clone());
-        let expected = "\n\n\n\n\n\n   X X\n    X \n   X X";
-        assert_eq!(
-            actual_string, expected,
-            "Expected:\n{}\nGot:\n{}\n",
-            expected, actual_string
-        )
+            let obj = RenderObject::new(Sprite::default(), object_coordinate);
+            let _ = panel
+                .write_object(obj)
+                .expect(&format!("Test case {} failed to write object to handle", i)[..]);
+
+            let actual_string = get_shared_mem_handle_content(mem_handle.clone());
+
+            assert_eq!(
+                actual_string, expected,
+                "Test case {} failed. Expected:\n{}\nGot:\n{}\n",
+                i, expected, actual_string
+            )
+        }
     }
     fn get_shared_mem_handle_content(handle: Arc<Mutex<MemoryHandle>>) -> String {
         let locked_writer_result = handle.lock();

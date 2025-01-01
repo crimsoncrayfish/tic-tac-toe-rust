@@ -1,8 +1,6 @@
 use std::fmt::Display;
 
-use crate::assert_r;
-
-use super::{shared_errors::SharedErrors, usize2d::Usize2d};
+use super::usize2d::{Coord, Usize2d};
 
 #[derive(Clone, Default, Debug)]
 /// A struct representing a rectancle in space
@@ -31,6 +29,9 @@ use super::{shared_errors::SharedErrors, usize2d::Usize2d};
 pub struct Square {
     top_left: Usize2d,
     bottom_right: Usize2d,
+
+    top_right: Usize2d,
+    bottom_left: Usize2d,
 }
 
 impl Square {
@@ -52,13 +53,25 @@ impl Square {
     ///
     /// let square= Square::new(top_left, bottom_right);
     /// ```
-    pub fn new(top_left: Usize2d, bottom_right: Usize2d) -> Result<Self, SharedErrors> {
-        assert_r!(top_left.x <= bottom_right.x, SharedErrors::BadCoordinate);
-        assert_r!(top_left.y <= bottom_right.y, SharedErrors::BadCoordinate);
-        Ok(Square {
-            top_left,
-            bottom_right,
-        })
+    pub fn new(top_left: Usize2d, bottom_right: Usize2d) -> Self {
+        assert!(
+            top_left.x <= bottom_right.x,
+            "The starting x coordinate ({}) is after the ending x coordinate ({})",
+            top_left.x,
+            bottom_right.x
+        );
+        assert!(
+            top_left.y <= bottom_right.y,
+            "The starting y coordinate ({}) is after the ending y coordinate ({})",
+            top_left.y,
+            bottom_right.y
+        );
+        Square {
+            top_left: top_left.clone(),
+            top_right: Usize2d::new(bottom_right.x, top_left.y),
+            bottom_right: bottom_right.clone(),
+            bottom_left: Usize2d::new(top_left.x, bottom_right.y),
+        }
     }
 
     /// Test if a coordinate is inside the square
@@ -81,12 +94,41 @@ impl Square {
     ///
     /// let is_in_square = square.is_in_square(coord);
     /// ```
-    pub fn is_in_square(self, coordinate: Usize2d) -> bool {
+    pub fn is_in_square(&self, coordinate: Usize2d) -> bool {
         coordinate.x >= self.top_left.x
             && coordinate.x <= self.bottom_right.x
             && coordinate.y >= self.top_left.y
             && coordinate.y <= self.bottom_right.y
     }
+    /// Test if a square overlaps with another
+    ///
+    /// # Arguments
+    ///
+    /// * `square` - the other square to be tested
+    ///
+    /// # Returns
+    /// A boolean value confirming wether the square overlaps with another
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let top_left= Usize2d::new(0, 0);
+    /// let bottom_right= Usize2d::new(10, 69);
+    /// let square= Square::new(top_left, bottom_right);
+    ///
+    /// let top_left= Usize2d::new(0, 0);
+    /// let bottom_right= Usize2d::new(10, 69);
+    /// let square2= Square::new(top_left, bottom_right);
+    ///
+    /// let overlaps= square.overlaps_with(square2);
+    /// ```
+    pub fn overlaps_with(&self, other: &Square) -> bool {
+        !(other.bottom_right.x < self.top_left.x
+            || other.top_left.x > self.bottom_right.x
+            || other.bottom_right.y < self.top_left.y
+            || other.top_left.y > self.bottom_right.y)
+    }
+
     /// Get the width of the square
     ///
     /// # Returns
@@ -123,6 +165,23 @@ impl Square {
     pub fn height(&self) -> usize {
         self.bottom_right.y - self.top_left.y + 1
     }
+    /// Get the start and end coordinates for the square
+    ///
+    /// # Returns
+    /// a `tuple` that contains the start and end coordinate for the square
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let top_left= Usize2d::new(0, 0);
+    /// let bottom_right= Usize2d::new(10, 69);
+    /// let square= Square::new(top_left, bottom_right);
+    ///
+    /// let (top_left, bottom_right)= square.get_boundary();
+    /// ```
+    pub fn get_boundary(&self) -> (Coord, Coord) {
+        (self.top_left, self.bottom_right)
+    }
 }
 
 impl Display for Square {
@@ -137,8 +196,101 @@ impl Display for Square {
 
 #[cfg(test)]
 pub mod test {
+    use std::panic::catch_unwind;
+
     use crate::shared::{square::Square, usize2d::Usize2d};
 
+    #[test]
+    fn overlap() {
+        let test_cases = vec![
+            (
+                1,
+                Square::new(Usize2d::new(0, 0), Usize2d::new(5, 5)),
+                Square::new(Usize2d::new(0, 0), Usize2d::new(5, 5)),
+                true,
+            ),
+            (
+                2,
+                Square::new(Usize2d::new(1, 1), Usize2d::new(5, 5)),
+                Square::new(Usize2d::new(0, 0), Usize2d::new(10, 10)),
+                true,
+            ),
+            (
+                3,
+                Square::new(Usize2d::new(0, 0), Usize2d::new(10, 10)),
+                Square::new(Usize2d::new(1, 1), Usize2d::new(5, 5)),
+                true,
+            ),
+            (
+                4,
+                Square::new(Usize2d::new(3, 5), Usize2d::new(10, 10)),
+                Square::new(Usize2d::new(9, 6), Usize2d::new(11, 8)),
+                true,
+            ),
+            (
+                5,
+                Square::new(Usize2d::new(9, 6), Usize2d::new(11, 8)),
+                Square::new(Usize2d::new(3, 5), Usize2d::new(10, 10)),
+                true,
+            ),
+            (
+                6,
+                Square::new(Usize2d::new(0, 0), Usize2d::new(5, 5)),
+                Square::new(Usize2d::new(9, 9), Usize2d::new(10, 10)),
+                false,
+            ),
+            (
+                7,
+                Square::new(Usize2d::new(9, 9), Usize2d::new(10, 10)),
+                Square::new(Usize2d::new(0, 0), Usize2d::new(5, 5)),
+                false,
+            ),
+            (
+                8,
+                Square::new(Usize2d::new(9, 0), Usize2d::new(10, 0)),
+                Square::new(Usize2d::new(0, 0), Usize2d::new(5, 5)),
+                false,
+            ),
+            (
+                9,
+                Square::new(Usize2d::new(0, 0), Usize2d::new(5, 5)),
+                Square::new(Usize2d::new(9, 0), Usize2d::new(10, 0)),
+                false,
+            ),
+            (
+                10,
+                Square::new(Usize2d::new(1, 9), Usize2d::new(3, 10)),
+                Square::new(Usize2d::new(0, 0), Usize2d::new(5, 5)),
+                false,
+            ),
+            (
+                11,
+                Square::new(Usize2d::new(0, 0), Usize2d::new(5, 5)),
+                Square::new(Usize2d::new(1, 9), Usize2d::new(3, 10)),
+                false,
+            ),
+        ];
+
+        for (i, sq1, sq2, expected) in test_cases {
+            if expected {
+                assert!(
+                    sq1.overlaps_with(&sq2),
+                    "Test case {}: Square 1 ({}) should overlap with Square 2 ({})",
+                    i,
+                    sq1,
+                    sq2
+                )
+            } else {
+                assert!(
+                    !sq1.overlaps_with(&sq2),
+                    "Test case {}: Square 1 ({}) should NOT overlap with Square 2 ({})",
+                    i,
+                    sq1,
+                    sq2
+                )
+            }
+        }
+    }
     #[test]
     fn valid_coordinate() {
         let top_left = Usize2d::new(5, 7);
@@ -156,10 +308,7 @@ pub mod test {
         let borderline_left = Usize2d::new(5, 10);
         let borderline_right = Usize2d::new(15, 10);
 
-        let square = Square {
-            top_left,
-            bottom_right,
-        };
+        let square = Square::new(top_left, bottom_right);
         let test_cases = vec![
             (too_far_top, false),
             (too_far_left, false),
@@ -186,8 +335,7 @@ pub mod test {
         let expected_width = 15;
         let expected_height = 18;
         let result = Square::new(Usize2d::new(3, 4), Usize2d::new(17, 21));
-        assert!(result.is_ok());
-        let square = result.unwrap();
+        let square = result;
 
         let actual_width = square.width();
         let actual_height = square.height();
@@ -213,15 +361,45 @@ pub mod test {
     fn init_fail_left_gt_right() {
         let top_left = Usize2d::new(1003, 4);
         let bottom_right = Usize2d::new(17, 21);
-        let result = Square::new(top_left.clone(), bottom_right.clone());
-        assert!(result.is_err(), "The left most coordinate ({}), cannot be more to the right than the right most coordinate ({})",top_left.x, bottom_right.x);
+
+        let result = catch_unwind(|| {
+            let _ = Square::new(top_left.clone(), bottom_right.clone());
+        });
+
+        assert!(result.is_err(), "Expected panic, but no panic occurred");
+
+        if let Err(err) = result {
+            let message = err.downcast_ref::<String>().unwrap();
+            assert!(
+                message.contains(
+                    "The starting x coordinate (1003) is after the ending x coordinate (17)"
+                ),
+                "Panic message did not match expected format: {}",
+                message
+            );
+        }
     }
 
     #[test]
     fn init_fail_top_gt_bottom() {
         let top_left = Usize2d::new(2, 20204);
         let bottom_right = Usize2d::new(17, 21);
-        let result = Square::new(top_left.clone(), bottom_right.clone());
-        assert!(result.is_err(), "The top most coordinate ({}), cannot be more to the bottom than the bottom most coordinate ({})",top_left.y, bottom_right.y);
+
+        let result = catch_unwind(|| {
+            let _ = Square::new(top_left.clone(), bottom_right.clone());
+        });
+
+        assert!(result.is_err(), "Expected panic, but no panic occurred");
+
+        if let Err(err) = result {
+            let message = err.downcast_ref::<String>().unwrap();
+            assert!(
+                message.contains(
+                    "The starting y coordinate (20204) is after the ending y coordinate (21)"
+                ),
+                "Panic message did not match expected format: {}",
+                message
+            );
+        }
     }
 }

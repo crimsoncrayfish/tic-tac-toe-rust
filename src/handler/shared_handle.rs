@@ -101,6 +101,15 @@ impl Handle for SharedHandle {
             .map_err(|_| SharedWriterErr::FailedToLock)?;
         locked_writer.set_background_color(color)
     }
+    fn write_to_location(
+        &mut self,
+        buf: &[u8],
+        coord: crate::shared::usize2d::Coord,
+    ) -> Result<usize, HandleError> {
+        //TODO: What even
+        let _ = self.set_cursor_location(coord)?;
+        self.write(buf).map_err(|_| HandleError::WriteFailed)
+    }
 }
 
 #[derive(Debug)]

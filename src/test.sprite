@@ -1,0 +1,22 @@
+[meta]
+name=test_sprite
+height=5
+width=5
+[chars]
+  x  
+ x x 
+x   x
+ x x 
+  x  
+[foreground_colors]
+Default,Default,Blue,Default,Default
+Default,Blue,Default,Blue,Default
+Blue,Default,Default,Default,Blue
+Default,Blue,Default,Blue,Default
+Default,Default,Blue,Default,Default
+[background_colors]
+Default,Default,Red,Default,Default
+Default,Red,Default,Red,Default
+Red,Default,Default,Default,Red
+Default,Red,Default,Red,Default
+Default,Default,Red,Default,Default
