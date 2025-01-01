@@ -29,13 +29,13 @@ jobs:
 
     - name: Generate code coverage
       run: |
-        cargo llvm-cov --all-features --workspace --html --output-path coverage.html
+        cargo llvm-cov --all-features --workspace --html
 
     - name: Upload Coverage Report
       uses: actions/upload-artifact@v4
       with: 
         name: coverage-report
-        path: ./coverage.html
+        path: target/llvm-cov/html/index.html
       
     - name: Run tests
       id: tests
