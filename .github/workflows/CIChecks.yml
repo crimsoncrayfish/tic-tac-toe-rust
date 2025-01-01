@@ -23,7 +23,84 @@ jobs:
 
     - name: Build
       run: cargo build --verbose
+
+    - name: Install cargo-llvm-cov
+      uses: taiki-e/install-action@cargo-llvm-cov
+
+    - name: Generate code coverage
+      id: coverage_summary
+      run: |
+        cargo llvm-cov --all-features --workspace --html
+        cargo llvm-cov report --json --output-path coverage.json
+        FILE="coverage.json"
+
+        if [[ -f "$FILE" ]]; then
+          lines_count=$(jq -r '.data[0].totals.lines.count' "$FILE")
+          lines_covered=$(jq -r '.data[0].totals.lines.covered' "$FILE")
+
+          functions_count=$(jq -r '.data[0].totals.functions.count' "$FILE")
+          functions_covered=$(jq -r '.data[0].totals.functions.covered' "$FILE")
+    
+          regions_count=$(jq -r '.data[0].totals.regions.count' "$FILE")
+          regions_covered=$(jq -r '.data[0].totals.regions.covered' "$FILE")
+    
+          instantiations_count=$(jq -r '.data[0].totals.instantiations.count' "$FILE")
+          instantiations_covered=$(jq -r '.data[0].totals.instantiations.covered' "$FILE")
+    
+          lines_percent=$(printf "%.2f" $(jq -r '.data[0].totals.lines.percent' "$FILE"))
+          functions_percent=$(printf "%.2f" $(jq -r '.data[0].totals.functions.percent' "$FILE"))
+          regions_percent=$(printf "%.2f" $(jq -r '.data[0].totals.regions.percent' "$FILE"))
+          instantiations_percent=$(printf "%.2f" $(jq -r '.data[0].totals.instantiations.percent' "$FILE"))
+          branches_percent=$(printf "%.2f" $(jq -r '.data[0].totals.branches.percent' "$FILE"))
+          mcdc_percent=$(printf "%.2f" $(jq -r '.data[0].totals.mcdc.percent' "$FILE"))
+    
+          # Build the summary string
+          summary="**Coverage Report Summary:**\\n"
+          summary+="Total Lines: $lines_count, Covered: $lines_covered ($lines_percent% coverage).\\n"
+          summary+="Total Functions: $functions_count, Covered: $functions_covered ($functions_percent% coverage).\\n"
+          summary+="Total Regions: $regions_count, Covered: $regions_covered ($regions_percent% coverage).\\n"
+          summary+="Total Instantiations: $instantiations_count, Covered: $instantiations_covered ($instantiations_percent% coverage).\\n"
+          summary+="Branch Coverage: $branches_percent%\\n"
+          summary+="MC/DC Coverage: $mcdc_percent%\\n"
+    
+          # Print the summary and set it as output
+          echo "$summary"
+          echo "::set-output name=coverage_summary::$summary"
+        else
+          echo "Coverage file not found."
+          echo "::set-output name=coverage_summary::Coverage file not found."
+        fi
+
+    - name: Post Coverage to PR
+      if: github.event_name == 'pull_request'
+      run: |
+        BODY="${{ steps.coverage_summary.outputs.coverage_summary }}"
+        PR_NUMBER=${{ github.event.pull_request.number }}
+        REPO=${{ github.repository }}
+        RESPONSE=$(curl -L \
+          -X POST \
+          -H "Accept: application/vnd.github+json" \
+          -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          "https://api.github.com/repos/$REPO/issues/$PR_NUMBER/comments" \
+          -d "{\"body\":\"$BODY\"}")
+        if [[ $? -ne 0 ]]; then
+          echo "Failed to post test results to PR. Response: $RESPONSE"
+          exit 1
+        fi
+
+    - name: Upload Coverage Report
+      uses: actions/upload-artifact@v4
+      with: 
+        name: coverage-report
+        path: target/llvm-cov/html/index.html
       
+    - name: Upload Coverage Report 2
+      uses: actions/upload-artifact@v4
+      with: 
+        name: coverage-report-json
+        path: coverage.json
+
     - name: Run tests
       id: tests
       run: |

@@ -25,6 +25,8 @@ pub mod rendering {
 
 pub mod shared {
     pub mod frame;
+    pub mod shared_errors;
+    pub mod square;
     pub mod usize2d;
 }
 pub mod handler {
@@ -46,11 +48,11 @@ fn main() -> Result<(), SystemException> {
 
 #[derive(Debug)]
 enum SystemException {
-    GameException,
-    InputReaderException,
-    CoordinatorException,
-    RedererException,
-    WindowsException,
+    _GameException,
+    _InputReaderException,
+    _CoordinatorException,
+    _RedererException,
+    _WindowsException,
 }
 
 /// Placeholder

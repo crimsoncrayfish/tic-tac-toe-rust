@@ -4,13 +4,12 @@ use std::{
 };
 
 use crate::{
-    assert_r,
     handler::handle::Handle,
     rendering::render_object::RenderObject,
-    shared::{frame::Pixel, usize2d::Usize2d},
+    shared::{frame::Pixel, square::Square, usize2d::Usize2d},
 };
 
-use super::{command_enum::PanelCommandEnum, errors::PanelException, state::PanelState};
+use super::{command_enum::PanelCommandEnum, errors::PanelError, state::PanelState};
 
 /// # Description
 ///
@@ -23,14 +22,13 @@ use super::{command_enum::PanelCommandEnum, errors::PanelException, state::Panel
 /// through a sender in the form of list of renderable sprites `Vec<RenderObject>`
 #[derive(Debug)]
 pub struct Panel {
-    previous_frame: Vec<Vec<Pixel>>,
-    next_frame: Vec<Vec<Pixel>>,
-    top_left: Usize2d,
-    bottom_right: Usize2d,
+    _previous_frame: Vec<Vec<Pixel>>,
+    _next_frame: Vec<Vec<Pixel>>,
+    area: Square,
     frame_receiver: Receiver<Vec<RenderObject>>,
     command_receiver: Receiver<PanelCommandEnum>,
     state: PanelState,
-    writer: Box<dyn Handle>,
+    handle: Box<dyn Handle>,
 }
 impl Panel {
     /// Initialize an instance of Window
@@ -60,31 +58,20 @@ impl Panel {
     /// let window= Window::init(size, top_left, bottom_right, frame_receiver, command_receiver);
     /// ```
     fn init(
-        size: Usize2d,
-        top_left: Usize2d,
-        bottom_right: Usize2d,
+        area: Square,
         frame_receiver: Receiver<Vec<RenderObject>>,
         command_receiver: Receiver<PanelCommandEnum>,
         handle: Box<dyn Handle>,
-    ) -> Result<Self, PanelException> {
-        let new_state = vec![vec![Pixel::default(); size.x]; size.y];
-        assert_r!(
-            top_left.x < bottom_right.x,
-            PanelException::BadCoordinateException
-        );
-        assert_r!(
-            top_left.y < bottom_right.y,
-            PanelException::BadCoordinateException
-        );
+    ) -> Result<Self, PanelError> {
+        let new_state = vec![vec![Pixel::default(); area.width()]; area.height()];
         Ok(Panel {
-            previous_frame: new_state.clone(),
-            next_frame: new_state.clone(),
-            top_left,
-            bottom_right,
+            _previous_frame: new_state.clone(),
+            _next_frame: new_state.clone(),
+            area,
             frame_receiver,
             command_receiver,
             state: PanelState::default(),
-            writer: handle,
+            handle,
         })
     }
 
@@ -96,7 +83,7 @@ impl Panel {
     /// let window= Window::init(...);
     /// window.run();
     /// ```
-    pub fn run(&mut self) {
+    pub fn run(&mut self) -> Result<(), PanelError> {
         loop {
             match self.command_receiver.try_recv() {
                 Ok(cmd) => self.state.process_command(cmd),
@@ -108,12 +95,16 @@ impl Panel {
             }
 
             match self.frame_receiver.try_recv() {
-                Ok(render_objects) => self.process_frame(render_objects),
-                Err(_) => (),
+                Ok(render_objects) => match self.process_frame(render_objects) {
+                    Ok(_) => {}
+                    Err(e) => return Err(e),
+                },
+                Err(_) => {}
             };
             // TODO: self.render_frame();
             // TODO: self.push_frame();
         }
+        Ok(())
     }
 
     /// Process received frame data
@@ -134,7 +125,10 @@ impl Panel {
     /// ];
     /// window.process_frame(render_objects);
     /// ```
-    pub fn process_frame(&mut self, _render_objects: Vec<RenderObject>) {}
+    pub fn process_frame(&mut self, _render_objects: Vec<RenderObject>) -> Result<(), PanelError> {
+        // TODO: write the objects to the panel
+        Ok(())
+    }
 
     /// Initialize and run on a new thread
     ///
@@ -165,153 +159,131 @@ impl Panel {
     /// handle.join().unwrap();
     /// ```
     pub fn init_run_async(
-        size: Usize2d,
-        top_left: Usize2d,
-        bottom_right: Usize2d,
+        area: Square,
         frame_receiver: Receiver<Vec<RenderObject>>,
         command_receiver: Receiver<PanelCommandEnum>,
         handle: Box<dyn Handle>,
-    ) -> Result<JoinHandle<()>, PanelException> {
-        let mut w = Panel::init(
-            size,
-            top_left,
-            bottom_right,
-            frame_receiver,
-            command_receiver,
-            handle,
-        )?;
+    ) -> Result<JoinHandle<()>, PanelError> {
+        let mut w = Panel::init(area, frame_receiver, command_receiver, handle)?;
         let window_closure = move || {
-            w.run();
+            let _ = w.run();
         };
         Ok(spawn(window_closure))
     }
-    /// Test if a coordinate is inside the panel
+    /// Write a `RenderObject` to the handle
     ///
     /// # Arguments
     ///
-    /// * `coord` - the coordinate to be tested
+    /// * `render_object` - an object to be rendered
     ///
     /// # Returns
-    /// A boolean value confirming wether the coordinate provided is inside the panel's coordinates
+    ///
+    /// A result object indicating success
     ///
     /// # Example
+    /// ```
+    /// let panel = Panel::init();
+    /// let render_object = RenderObject::default();
+    /// let result = panel.write_object(render_object);
+    /// assert!(result.is_ok());
     ///
     /// ```
-    /// let size = Usize2d::new(10, 69);
-    /// let top_left= Usize2d::new(0, 0);
-    /// let bottom_right= Usize2d::new(10, 69);
-    /// let bottom_right= Usize2d::new(10, 69);
-    /// let (_, frame_receiver) = channel();
-    /// let (_, command_receiver) = channel();
-    ///
-    /// let window= Window::init(size, top_left, bottom_right, frame_receiver, command_receiver);
-    /// ```
-    pub fn coord_is_in_panel(&mut self, coord: Usize2d) -> bool {
-        coord.x >= self.top_left.x
-            && coord.x <= self.bottom_right.x
-            && coord.y >= self.top_left.y
-            && coord.y <= self.bottom_right.y
+    fn write_object(mut self, render_object: RenderObject) -> Result<bool, PanelError> {
+        if !self.area.overlaps_with(&render_object.get_area()) {
+            println!(
+                "No overlap for object with coord: {}",
+                render_object.get_location()
+            );
+            println!("Panel area: {}", self.area);
+            println!("Object area: {}", render_object.get_area());
+            return Err(PanelError::OutOfBounds);
+        }
+        let to_write: Vec<Vec<u8>> = match render_object.get_content_to_write(self.area.clone()) {
+            Ok(w) => w,
+            Err(_) => return Ok(false),
+        };
+
+        for index in 0..to_write.len() {
+            let _ = self
+                .handle
+                .set_cursor_location(render_object.get_location() + Usize2d::new(0, index))
+                .map_err(|_| PanelError::WriteLocationFailed)?;
+
+            // TODO: Switch colors
+            println!("Coordinate: {}", render_object.get_location());
+            let _ = self
+                .handle
+                .write(&to_write[index])
+                .map_err(|_| PanelError::WriteFailed)?;
+        }
+        let _ = self.handle.flush();
+
+        Ok(true)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{sync::mpsc::channel, thread::sleep, time::Duration};
+    use std::{
+        sync::{mpsc::channel, Arc, Mutex},
+        thread::sleep,
+        time::Duration,
+    };
 
     use crate::{
-        handler::memory_handle::MemoryHandle,
-        panel::{command_enum::PanelCommandEnum, errors::PanelException},
-        shared::{frame::Pixel, usize2d::Usize2d},
+        handler::{memory_handle::MemoryHandle, shared_handle::SharedHandle},
+        panel::command_enum::PanelCommandEnum,
+        rendering::{render_object::RenderObject, sprite::Sprite},
+        shared::{
+            frame::Pixel,
+            square::Square,
+            usize2d::{Coord, Usize2d},
+        },
     };
 
     use super::Panel;
 
     #[test]
     fn init() {
-        let size = Usize2d::new(10, 20);
         let top_left = Usize2d::new(0, 0);
         let bottom_right = Usize2d::new(10, 20);
+        let square = Square::new(top_left, bottom_right);
         let handle = Box::new(MemoryHandle::new());
         let (_, frame_receiver) = channel();
         let (_, command_receiver) = channel();
 
-        let window = Panel::init(
-            size,
-            top_left,
-            bottom_right,
-            frame_receiver,
-            command_receiver,
-            handle,
-        );
+        let window = Panel::init(square, frame_receiver, command_receiver, handle);
         assert!(window.is_ok());
         let window = window.unwrap();
+        let expected = vec![vec![Pixel::default(); 11]; 21];
 
-        assert_eq!(window.previous_frame, vec![vec![Pixel::default(); 10]; 20]);
-        assert_eq!(window.next_frame, vec![vec![Pixel::default(); 10]; 20]);
-    }
-
-    #[test]
-    fn init_fail_left_gt_right() {
-        let size = Usize2d::new(10, 20);
-        let top_left = Usize2d::new(1, 0);
-        let bottom_right = Usize2d::new(0, 20);
-        let handle = Box::new(MemoryHandle::new());
-        let (_, frame_receiver) = channel();
-        let (_, command_receiver) = channel();
-
-        let window = Panel::init(
-            size,
-            top_left,
-            bottom_right,
-            frame_receiver,
-            command_receiver,
-            handle,
+        assert_eq!(
+            window._previous_frame,
+            expected,
+            "Default initialization previous frame is wrong. Expected lenth: {}, Actual length: {}",
+            expected.len(),
+            window._previous_frame.len()
         );
-
-        assert!(window.is_err());
-        let error = window.unwrap_err();
-        assert!(error == PanelException::BadCoordinateException);
-    }
-
-    #[test]
-    fn init_fail_top_gt_bottom() {
-        let size = Usize2d::new(10, 20);
-        let top_left = Usize2d::new(0, 1);
-        let bottom_right = Usize2d::new(10, 0);
-        let handle = Box::new(MemoryHandle::new());
-        let (_, frame_receiver) = channel();
-        let (_, command_receiver) = channel();
-
-        let window = Panel::init(
-            size,
-            top_left,
-            bottom_right,
-            frame_receiver,
-            command_receiver,
-            handle,
+        assert_eq!(
+            window._next_frame,
+            expected,
+            "Default initialization for next frame is wrong. Expected lenth: {}, Actual length: {}",
+            expected.len(),
+            window._next_frame.len()
         );
-        assert!(window.is_err());
-        let error = window.unwrap_err();
-        assert!(error == PanelException::BadCoordinateException);
     }
 
     #[test]
     fn run_and_kill() {
-        let size = Usize2d::new(10, 20);
         let top_left = Usize2d::new(0, 0);
         let bottom_right = Usize2d::new(10, 20);
+        let square = Square::new(top_left, bottom_right);
+
         let handle = Box::new(MemoryHandle::new());
         let (_, frame_receiver) = channel();
         let (command_sender, command_receiver) = channel();
 
-        let handle = Panel::init_run_async(
-            size,
-            top_left,
-            bottom_right,
-            frame_receiver,
-            command_receiver,
-            handle,
-        );
+        let handle = Panel::init_run_async(square, frame_receiver, command_receiver, handle);
         let result = command_sender.send(PanelCommandEnum::KillProcess);
         assert!(
             !result.is_err(),
@@ -326,21 +298,15 @@ mod tests {
 
     #[test]
     fn run_and_write() {
-        let size = Usize2d::new(10, 20);
         let top_left = Usize2d::new(0, 0);
         let bottom_right = Usize2d::new(10, 20);
+        let square = Square::new(top_left, bottom_right);
+
         let handle = Box::new(MemoryHandle::new());
         let (_frame_sender, frame_receiver) = channel();
         let (command_sender, command_receiver) = channel();
 
-        let handle = Panel::init_run_async(
-            size,
-            top_left,
-            bottom_right,
-            frame_receiver,
-            command_receiver,
-            handle,
-        );
+        let handle = Panel::init_run_async(square, frame_receiver, command_receiver, handle);
 
         //TODO: writer and write command
 
@@ -355,100 +321,56 @@ mod tests {
             "The process should be completed due to the kill command"
         );
     }
-
     #[test]
-    fn valid_coordinate() {
-        let top_left = Usize2d::new(5, 7);
-        let bottom_right = Usize2d::new(15, 20);
+    fn write_object() {
+        let test_cases = vec![
+            (
+                1,
+                Usize2d::default(),
+                Usize2d::new(100, 100),
+                Coord::new(10, 6),
+                "\n\n\n\n\n\n          X X\n           X \n          X X",
+            ),
+            (
+                2,
+                Usize2d::new(3, 5),
+                Usize2d::new(10, 10),
+                Coord::new(9, 6),
+                "\n\n\n\n\n\n         X \n          X\n         X ",
+            ),
+        ];
 
-        let too_far_left = Usize2d::new(4, 8);
-        let too_far_top = Usize2d::new(7, 6);
-        let too_far_right = Usize2d::new(24, 8);
-        let too_far_bottom = Usize2d::new(5, 26);
+        for (i, top_left, bottom_right, object_coordinate, expected) in test_cases {
+            let square = Square::new(top_left, bottom_right);
+            let mem_handle = Arc::new(Mutex::new(MemoryHandle::new()));
 
-        let just_right = Usize2d::new(12, 16);
+            let handle = SharedHandle::init(mem_handle.clone());
+            let (_frame_sender, frame_receiver) = channel();
+            let (_, command_receiver) = channel();
 
-        let borderline_top = Usize2d::new(7, 7);
-        let borderline_bottom = Usize2d::new(8, 20);
-        let borderline_left = Usize2d::new(5, 10);
-        let borderline_right = Usize2d::new(15, 10);
+            let panel = Panel::init(square, frame_receiver, command_receiver, Box::new(handle))
+                .expect("Failed to init the panel");
 
-        let (_, frame_receiver) = channel();
-        let (_, command_receiver) = channel();
-        let handle = Box::new(MemoryHandle::new());
-        let w = Panel::init(
-            Usize2d::default(),
-            top_left,
-            bottom_right,
-            frame_receiver,
-            command_receiver,
-            handle,
-        );
-        assert!(w.is_ok());
-        let mut w = w.unwrap();
+            let obj = RenderObject::new(Sprite::default(), object_coordinate);
+            let _ = panel
+                .write_object(obj)
+                .expect(&format!("Test case {} failed to write object to handle", i)[..]);
 
-        assert!(
-            !w.coord_is_in_panel(too_far_left.clone()),
-            "This coordinate ({}) is outside of the boundary of the panel (top_left: ({}), bottom_right: ({})",
-            too_far_left,
-            w.top_left,
-            w.bottom_right
-        );
-        assert!(
-            !w.coord_is_in_panel(too_far_top.clone()),
-            "This coordinate ({}) is outside of the boundary of the panel (top_left: ({}), bottom_right: ({})",
-            too_far_top,
-            w.top_left,
-            w.bottom_right
-        );
-        assert!(
-            !w.coord_is_in_panel(too_far_bottom.clone()),
-            "This coordinate ({}) is outside of the boundary of the panel (top_left: ({}), bottom_right: ({})",
-            too_far_bottom,
-            w.top_left,
-            w.bottom_right
-        );
-        assert!(
-            !w.coord_is_in_panel(too_far_right.clone()),
-            "This coordinate ({}) is outside of the boundary of the panel (top_left: ({}), bottom_right: ({})",
-            too_far_right,
-            w.top_left,
-            w.bottom_right
-        );
-        assert!(
-            w.coord_is_in_panel(just_right.clone()),
-            "This coordinate ({}) is inside of the boundary of the panel (top_left: ({}), bottom_right: ({})",
-            just_right,
-            w.top_left,
-            w.bottom_right
-        );
-        assert!(
-            w.coord_is_in_panel(borderline_top.clone()),
-            "This coordinate ({}) is on the boundary of the panel (top_left: ({}), bottom_right: ({})",
-            borderline_top,
-            w.top_left,
-            w.bottom_right
-        );
-        assert!(
-            w.coord_is_in_panel(borderline_bottom.clone()),
-            "This coordinate ({}) is on the boundary of the panel (top_left: ({}), bottom_right: ({})",
-            borderline_bottom,
-            w.top_left,
-            w.bottom_right
-        );
-        assert!(
-            w.coord_is_in_panel(borderline_left.clone()),
-            "This coordinate ({}) is on the boundary of the panel (top_left: ({}), bottom_right: ({})",
-            borderline_left,
-            w.top_left,
-            w.bottom_right
-        );
-        assert!(
-            w.coord_is_in_panel(borderline_right.clone()),
-            "This coordinate ({}) is on the boundary of the panel (top_left: ({}), bottom_right: ({})",
-            borderline_right,
-            w.top_left,
-            w.bottom_right
-        );
+            let actual_string = get_shared_mem_handle_content(mem_handle.clone());
+
+            assert_eq!(
+                actual_string, expected,
+                "Test case {} failed. Expected:\n{}\nGot:\n{}\n",
+                i, expected, actual_string
+            )
+        }
+    }
+    fn get_shared_mem_handle_content(handle: Arc<Mutex<MemoryHandle>>) -> String {
+        let locked_writer_result = handle.lock();
+        let guard = locked_writer_result.unwrap();
+        let locked = &*guard;
+        let actual = locked.get_buffer_content();
+
+        String::from_utf8_lossy(&actual).to_string()
     }
 }

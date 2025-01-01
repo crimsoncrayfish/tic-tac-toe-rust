@@ -52,4 +52,12 @@ impl Handle for StdIOHandle {
             Err(_) => Err(HandleError::SetForegroundFailed),
         }
     }
+    fn write_to_location(
+        &mut self,
+        buf: &[u8],
+        coord: crate::shared::usize2d::Coord,
+    ) -> Result<usize, HandleError> {
+        let _ = self.set_cursor_location(coord)?;
+        self.write(buf).map_err(|_| HandleError::WriteFailed)
+    }
 }

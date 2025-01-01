@@ -4,4 +4,5 @@ pub enum HandleError {
     SetCursorLocationFailed,
     SetForegroundFailed,
     SetBackgroundFailed,
+    LockFailed,
 }

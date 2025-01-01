@@ -6,11 +6,11 @@ use std::{
 
 use crate::{
     rendering::colors::TerminalColors,
-    shared::usize2d::Usize2d,
+    shared::usize2d::{Coord, Usize2d},
     utils::vec_t_writer::{write_t_to_vec, write_vec_to_vec},
 };
 
-use super::handle::Handle;
+use super::{handle::Handle, handle_error::HandleError};
 
 /// The behavior of `MemoryHandle` shoudld be as similar to the `StdOut` behaviour as possible.
 /// It is used for unit/simulation testing
@@ -42,11 +42,15 @@ impl MemoryHandle {
     }
 }
 impl MemoryHandle {
-    pub fn get_buffer_content(&mut self) -> Vec<u8> {
-        let mut result: Vec<u8> = Vec::new(); // TODO: could define with capacity here
+    pub fn get_buffer_content(&self) -> Vec<u8> {
+        if self.buffer.len() == 0 {
+            return Vec::new();
+        }
+        assert!(self.buffer.len() > 0);
+        let mut result: Vec<u8> = Vec::with_capacity(self.buffer_temp.len() * 2 - 1);
 
         for index in 0..self.buffer_temp.len() {
-            result.append(&mut self.buffer_temp[index].clone());
+            result.extend(self.buffer_temp[index].clone());
             if index < self.buffer_temp.len() - 1 {
                 result.push(b'\n');
             }
@@ -54,8 +58,14 @@ impl MemoryHandle {
 
         result
     }
+    pub fn get_background_colors(&self) -> Vec<Vec<TerminalColors>> {
+        self.background_color_buffer.clone()
+    }
+    pub fn get_foreground_colors(&self) -> Vec<Vec<TerminalColors>> {
+        self.foreground_color_buffer.clone()
+    }
     pub fn need_to_flush(self) -> bool {
-        self.buffer_temp.len() > 0
+        self.buffer_temp != self.buffer
     }
 }
 
@@ -129,26 +139,21 @@ impl Write for MemoryHandle {
 }
 
 impl Handle for MemoryHandle {
-    fn set_cursor_location(
-        &mut self,
-        coordinate: Usize2d,
-    ) -> Result<(), super::handle_error::HandleError> {
+    fn set_cursor_location(&mut self, coordinate: Usize2d) -> Result<(), HandleError> {
         self.current_cursor_location = coordinate;
         Ok(())
     }
-    fn set_foreground_color(
-        &mut self,
-        color: TerminalColors,
-    ) -> Result<(), super::handle_error::HandleError> {
+    fn set_foreground_color(&mut self, color: TerminalColors) -> Result<(), HandleError> {
         self.current_foreground_color = color;
         Ok(())
     }
-    fn set_background_color(
-        &mut self,
-        color: TerminalColors,
-    ) -> Result<(), super::handle_error::HandleError> {
+    fn set_background_color(&mut self, color: TerminalColors) -> Result<(), HandleError> {
         self.current_background_color = color;
         Ok(())
+    }
+    fn write_to_location(&mut self, buf: &[u8], coord: Coord) -> Result<usize, HandleError> {
+        let _ = self.set_cursor_location(coord)?;
+        self.write(buf).map_err(|_| HandleError::WriteFailed)
     }
 }
 
@@ -156,21 +161,22 @@ impl Handle for MemoryHandle {
 mod tests {
     use std::io::Write;
 
+    use crate::rendering::colors::TerminalColors as TC;
     use crate::{
         handler::{handle::Handle, memory_handle::MemoryHandle},
         shared::usize2d::Usize2d,
+        vec_vec_enum_to_string,
     };
 
     #[test]
     fn hello_world() {
         let mut handle = MemoryHandle::new();
         let test_str: &[u8] = b"Hello world";
-        let _ = match handle.write(test_str) {
-            Ok(_) => (),
-            Err(_) => assert!(false, "This should never happen"),
-        };
+        let result = handle.write(test_str);
+        assert!(result.is_ok(), "Write should not fail");
+
         let result = handle.flush();
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "Flush should not fail");
 
         let buffer_content: Vec<u8> = handle.get_buffer_content();
         let result = String::from_utf8_lossy(&buffer_content);
@@ -194,10 +200,11 @@ mod tests {
         assert!(set_cursor_result.is_ok());
 
         let test_str: &[u8] = b"rust ";
-        let write_result = handle.write(test_str);
-        assert!(write_result.is_ok());
+        let result = handle.write(test_str);
+        assert!(result.is_ok(), "Write should not fail");
+
         let result = handle.flush();
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "Flush should not fail");
 
         let buffer_content: Vec<u8> = handle.get_buffer_content();
         let result = String::from_utf8_lossy(&buffer_content);
@@ -218,12 +225,11 @@ mod tests {
         assert!(result.is_ok());
 
         let test_str: &[u8] = b"Hello world";
-        let _ = match handle.write(test_str) {
-            Ok(_) => (),
-            Err(_) => assert!(false, "This should never happen"),
-        };
+        let result = handle.write(test_str);
+        assert!(result.is_ok(), "Write should not fail");
+
         let result = handle.flush();
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "Flush should not fail");
 
         let buffer_content: Vec<u8> = handle.get_buffer_content();
         let result = String::from_utf8_lossy(&buffer_content);
@@ -234,6 +240,113 @@ mod tests {
             expected, result,
             "The initial string written to the MemoryHandle should match to output. Got: \'{}\', Expected: \'{}\'",
             result, expected
+        );
+    }
+    #[test]
+    fn set_colors() {
+        let mut handle = MemoryHandle::new();
+
+        let result = handle.set_foreground_color(TC::Red);
+        assert!(result.is_ok());
+        assert_eq!(
+            handle.current_foreground_color,
+            TC::Red,
+            "Expected foreground color: {}, Got: {}",
+            handle.current_foreground_color,
+            TC::Red
+        );
+
+        let result = handle.set_background_color(TC::Black);
+        assert!(result.is_ok());
+        assert_eq!(
+            handle.current_background_color,
+            TC::Black,
+            "Expected background color: {}, Got: {}",
+            handle.current_background_color,
+            TC::Black
+        );
+
+        let result = handle.set_cursor_location(Usize2d::new(5, 2));
+        assert!(result.is_ok());
+
+        let test_str: &[u8] = b"Hello world";
+        let result = handle.write(test_str);
+        assert!(result.is_ok(), "Write should not fail");
+
+        let result = handle.flush();
+        assert!(result.is_ok(), "Flush should not fail");
+
+        let buffer_content: Vec<u8> = handle.get_buffer_content();
+        let result = String::from_utf8_lossy(&buffer_content);
+
+        let expected = "\n\n     Hello world".to_string();
+
+        assert_eq!(
+            expected, result,
+            "The initial string written to the MemoryHandle should match to output. Got: \'{}\', Expected: \'{}\'",
+            result, expected
+        );
+        let background_colors = handle.get_background_colors();
+        let expected: Vec<Vec<TC>> = vec![
+            vec![], //
+            vec![], //
+            vec![
+                TC::Default,
+                TC::Default,
+                TC::Default,
+                TC::Default,
+                TC::Default,
+                TC::Default,
+                TC::Default,
+                TC::Default,
+                TC::Default,
+                TC::Default,
+                TC::Default,
+                TC::Black,
+                TC::Black,
+                TC::Black,
+                TC::Black,
+                TC::Black,
+            ], //
+        ];
+
+        assert_eq!(
+            expected,
+            background_colors,
+            "The background colors should match the expected colors. Got: \'{}\', Expected: \'{}\'",
+            vec_vec_enum_to_string!(background_colors),
+            vec_vec_enum_to_string!(expected)
+        );
+        let foreground_colors = handle.get_foreground_colors();
+        let expected: Vec<Vec<TC>> = vec![
+            vec![], //
+            vec![], //
+            vec![
+                TC::Default,
+                TC::Default,
+                TC::Default,
+                TC::Default,
+                TC::Default,
+                TC::Default,
+                TC::Default,
+                TC::Default,
+                TC::Default,
+                TC::Default,
+                TC::Default,
+                TC::Red,
+                TC::Red,
+                TC::Red,
+                TC::Red,
+                TC::Red,
+            ], //
+        ];
+
+        assert_eq!(
+            expected,
+            foreground_colors,
+            "The foreground colors should match the expected colors. Got: \'{}\', Expected: \'{}\'",
+            vec_vec_enum_to_string!(foreground_colors),
+            vec_vec_enum_to_string!(expected)
         );
     }
 }
