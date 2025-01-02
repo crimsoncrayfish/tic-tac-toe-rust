@@ -38,6 +38,8 @@ Responsibilities:
 
 ## 3. Renderer
 
+This could be combined with the coordinator process as there will be only one instance of this and the rest of the coordinator processes only run at startup or are incredibly simple process as there will be only one instance of this and the rest of the coordinator processes only run at startup or are incredibly simple process as there will be only one instance of this and the rest of the coordinator processes only run at startup or are incredibly simple process as there will be only one instance of this and the rest of the coordinator processes only run at startup or are incredibly simple.
+
 Responsibilities:
 
 - Manages terminal layout by tracking terminal size.
@@ -48,14 +50,46 @@ Responsibilities:
 - Collects rendered data from all windows and outputs the final display to the terminal.
 ![image](https://github.com/user-attachments/assets/a1541dcf-20e4-4acc-b70a-18bd1f49d374)
 
-## 4. Windows
+## 4. Panels
 
 Responsibilities:
 
-- Receives data from the game process.
+- Receives data (as Sprites with coordinates) from the game process.
 - Adjusts game data to fit the available window space before rendering it.
 - Can be activated or deactivated by the game process.
 ![image](https://github.com/user-attachments/assets/5ccba192-c9aa-4910-b4b9-cd7fa8d9fb4a)
+
+### Rendering Implementation
+
+#### 1. Input Processing
+- Receive a list of objects (such as sprites) to be rendered in the terminal. Each object contains its content and associated foreground/background colors.
+
+#### 2. State Calculation
+- Construct a `Vec<Vec<u8>>` to represent the content grid and two `Vec<Vec<color>>` structures for foreground and background colors. These grids represent the entire frame to be rendered.
+
+#### 3. Output Stream Generation
+- Process the calculated frame into an optimized output stream:
+  1. **Initialize Output**  
+     - Begin the output stream by setting the cursor position to the starting point of the updates.
+  2. **Row Comparisons**  
+     - Compare each row in the current `Vec<Vec<u8>>` and `Vec<Vec<color>>` to the previous frame's state. Identify rows with differences.
+  3. **Row Update Strategy**  
+     - If a row has **less than 30% differences**, use ANSI escape codes to move the cursor to the affected positions and update only those parts.
+     - If a row has **30% or more differences**, recalculate and write the entire row.
+  4. **Row Content Preparation**  
+     - For each updated row:
+       - Combine the characters and their corresponding ANSI color codes into a single, efficient sequence for output.
+       - Avoid emitting redundant ANSI escape codes for consecutive characters with the same color. Group such segments to minimize overhead.
+  5. **Cursor Movement**  
+     - After processing a row, calculate and move the cursor to the next row’s starting position.
+
+##### 4. Output Rendering
+- Write the entire generated output stream to the console in a single operation, minimizing I/O overhead and cursor repositioning.
+
+---
+
+#### Notes
+- **Threshold for Updates**: The 30% threshold for partial vs. full row updates is a heuristic. Optimal performance may require adjusting this value based on testing and specific terminal behavior. Consider making this value configurable.
 
 ## 5. Game Process
 
@@ -132,3 +166,4 @@ Mock each process (e.g., a mock game or renderer) to simulate real-world conditi
 
 3. Logging:
 Incorporate structured logging (including per-thread identifiers) to debug inter-thread communication issues.
+
