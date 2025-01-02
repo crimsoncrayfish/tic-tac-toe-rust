@@ -47,7 +47,8 @@ Responsibilities:
     - A pixel corresponds to one terminal character.
     - A window refers to a process responsible for rendering content in a section of the terminal.
 - Supports hiding windows, recalculating space for other windows, and notifying them of layout changes.
-- Collects rendered data from all windows and outputs the final display to the terminal.
+- Each window is in control of writing the output.
+- The windows share an instance of a `Handle` that can be locked to write to the terminal
 ![image](https://github.com/user-attachments/assets/a1541dcf-20e4-4acc-b70a-18bd1f49d374)
 
 ## 4. Panels
