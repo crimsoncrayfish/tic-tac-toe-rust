@@ -6,7 +6,7 @@ use std::{
 use crate::{
     handler::handle::Handle,
     rendering::render_object::RenderObject,
-    shared::{frame::Pixel, square::Square, usize2d::Usize2d},
+    shared::{frame::Frame, square::Square, usize2d::Usize2d},
 };
 
 use super::{command_enum::PanelCommandEnum, errors::PanelError, state::PanelState};
@@ -22,8 +22,8 @@ use super::{command_enum::PanelCommandEnum, errors::PanelError, state::PanelStat
 /// through a sender in the form of list of renderable sprites `Vec<RenderObject>`
 #[derive(Debug)]
 pub struct Panel {
-    _previous_frame: Vec<Vec<Pixel>>,
-    _next_frame: Vec<Vec<Pixel>>,
+    previous_frame: Frame,
+    next_frame: Frame,
     area: Square,
     frame_receiver: Receiver<Vec<RenderObject>>,
     command_receiver: Receiver<PanelCommandEnum>,
@@ -63,10 +63,10 @@ impl Panel {
         command_receiver: Receiver<PanelCommandEnum>,
         handle: Box<dyn Handle>,
     ) -> Result<Self, PanelError> {
-        let new_state = vec![vec![Pixel::default(); area.width()]; area.height()];
+        let new_state = Frame::default_with_size(area.width(), area.height());
         Ok(Panel {
-            _previous_frame: new_state.clone(),
-            _next_frame: new_state.clone(),
+            previous_frame: new_state.clone(),
+            next_frame: new_state.clone(),
             area,
             frame_receiver,
             command_receiver,
@@ -198,7 +198,7 @@ impl Panel {
             println!("Object area: {}", render_object.get_area());
             return Err(PanelError::OutOfBounds);
         }
-        let to_write: Vec<Vec<u8>> = match render_object.get_content_to_write(self.area.clone()) {
+        let to_write: Frame = match render_object.get_content_to_write(self.area.clone()) {
             Ok(w) => w,
             Err(_) => return Ok(false),
         };
@@ -213,7 +213,7 @@ impl Panel {
             println!("Coordinate: {}", render_object.get_location());
             let _ = self
                 .handle
-                .write(&to_write[index])
+                .write(&to_write.get_chars()[index])
                 .map_err(|_| PanelError::WriteFailed)?;
         }
         let _ = self.handle.flush();
@@ -235,7 +235,7 @@ mod tests {
         panel::command_enum::PanelCommandEnum,
         rendering::{render_object::RenderObject, sprite::Sprite},
         shared::{
-            frame::Pixel,
+            frame::Frame,
             square::Square,
             usize2d::{Coord, Usize2d},
         },
@@ -255,21 +255,21 @@ mod tests {
         let window = Panel::init(square, frame_receiver, command_receiver, handle);
         assert!(window.is_ok());
         let window = window.unwrap();
-        let expected = vec![vec![Pixel::default(); 11]; 21];
+        let expected = Frame::default_with_size(11, 21);
 
         assert_eq!(
-            window._previous_frame,
+            window.previous_frame,
             expected,
             "Default initialization previous frame is wrong. Expected lenth: {}, Actual length: {}",
             expected.len(),
-            window._previous_frame.len()
+            window.previous_frame.len()
         );
         assert_eq!(
-            window._next_frame,
+            window.next_frame,
             expected,
             "Default initialization for next frame is wrong. Expected lenth: {}, Actual length: {}",
             expected.len(),
-            window._next_frame.len()
+            window.next_frame.len()
         );
     }
 

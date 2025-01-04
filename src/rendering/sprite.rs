@@ -2,7 +2,7 @@ use std::usize;
 
 use crate::{
     assert_r,
-    shared::{shared_errors::SharedErrors, square::Square, usize2d::Coord},
+    shared::{frame::PixelGrid, shared_errors::SharedErrors, square::Square, usize2d::Coord},
 };
 
 use super::colors::TerminalColors as TC;
@@ -12,8 +12,8 @@ pub struct Sprite {
     pub width: usize,
     pub height: usize,
     chars: Vec<Vec<u8>>,
-    _background_colors: Vec<Vec<TC>>,
-    _foreground_colors: Vec<Vec<TC>>,
+    background_colors: Vec<Vec<TC>>,
+    foreground_colors: Vec<Vec<TC>>,
 }
 impl Default for Sprite {
     fn default() -> Self {
@@ -26,12 +26,12 @@ impl Default for Sprite {
                 vec![b' ', b'X', b' '],
                 vec![b'X', b' ', b'X'],
             ],
-            _background_colors: vec![
+            background_colors: vec![
                 vec![TC::Red, TC::White, TC::Red],
                 vec![TC::White, TC::Red, TC::White],
                 vec![TC::Red, TC::White, TC::Red],
             ],
-            _foreground_colors: vec![
+            foreground_colors: vec![
                 vec![TC::Red, TC::White, TC::Red],
                 vec![TC::White, TC::Red, TC::White],
                 vec![TC::Red, TC::White, TC::Red],
@@ -89,8 +89,8 @@ impl Sprite {
             width,
             height,
             chars,
-            _background_colors: background_colors,
-            _foreground_colors: foreground_colors,
+            background_colors,
+            foreground_colors,
         }
     }
     ///
@@ -121,7 +121,7 @@ impl Sprite {
         &self,
         coord: Coord,
         area: Square,
-    ) -> Result<Vec<Vec<u8>>, SharedErrors> {
+    ) -> Result<PixelGrid, SharedErrors> {
         let (area_top_left, area_bottom_right) = area.get_boundary();
 
         let (x_start, x_end) = Self::get_indexes_in_range(
@@ -138,10 +138,20 @@ impl Sprite {
             area_bottom_right.y,
         )?;
 
-        Ok(self.chars[y_start..=y_end]
-            .iter()
-            .map(|row| row[x_start..=x_end].to_vec())
-            .collect())
+        Ok(PixelGrid::new(
+            self.chars[y_start..=y_end]
+                .iter()
+                .map(|row| row[x_start..=x_end].to_vec())
+                .collect(),
+            self.foreground_colors[y_start..=y_end]
+                .iter()
+                .map(|row| row[x_start..=x_end].to_vec())
+                .collect(),
+            self.background_colors[y_start..=y_end]
+                .iter()
+                .map(|row| row[x_start..=x_end].to_vec())
+                .collect(),
+        ))
     }
 
     /// Helper function to get the start and end indexes in a range
@@ -289,10 +299,10 @@ pub mod test {
         let actual = actual_result.unwrap();
         assert_eq!(
             expected,
-            actual,
+            actual.get_chars(),
             "Expected:\n{}\nGot:\n{}",
             vec_vec_u8_to_string!(expected),
-            vec_vec_u8_to_string!(actual)
+            vec_vec_u8_to_string!(actual.get_chars())
         );
     }
     #[test]

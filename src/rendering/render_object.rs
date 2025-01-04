@@ -1,8 +1,5 @@
-use std::io::Error;
-
-use crate::{
-    handler::handle::Handle,
-    shared::{shared_errors::SharedErrors, square::Square, usize2d::Coord},
+use crate::shared::{
+    frame::PixelGrid, shared_errors::SharedErrors, square::Square, usize2d::Coord,
 };
 
 use super::sprite::Sprite;
@@ -48,7 +45,7 @@ impl RenderObject {
     /// let clamp = Square::default();
     /// let content_to_write: Vec<Vec<u8>> = render_object.get_content_to_write(clamp);
     /// ```
-    pub fn get_content_to_write(&self, clamp: Square) -> Result<Vec<Vec<u8>>, SharedErrors> {
+    pub fn get_content_to_write(&self, clamp: Square) -> Result<PixelGrid, SharedErrors> {
         self.sprite.get_content_for_area(self.coordinate, clamp)
     }
 }
