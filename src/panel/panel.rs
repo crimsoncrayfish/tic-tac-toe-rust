@@ -95,7 +95,7 @@ impl Panel {
             }
 
             match self.frame_receiver.try_recv() {
-                Ok(render_objects) => match self.process_frame(render_objects) {
+                Ok(render_objects) => match self.process_objects(render_objects) {
                     Ok(_) => {}
                     Err(e) => return Err(e),
                 },
@@ -125,8 +125,15 @@ impl Panel {
     /// ];
     /// window.process_frame(render_objects);
     /// ```
-    pub fn process_frame(&mut self, _render_objects: Vec<RenderObject>) -> Result<(), PanelError> {
-        // TODO: write the objects to the panel
+    pub fn process_objects(
+        &mut self,
+        mut render_objects: Vec<RenderObject>,
+    ) -> Result<(), PanelError> {
+        render_objects.sort_by_key(|k| k.get_location().z);
+        for object in render_objects {
+            let _was_written = self.write_object(object)?;
+            // TODO: log when an object was not written
+        }
         Ok(())
     }
 
@@ -188,7 +195,7 @@ impl Panel {
     /// assert!(result.is_ok());
     ///
     /// ```
-    fn write_object(mut self, render_object: RenderObject) -> Result<bool, PanelError> {
+    fn write_object(&mut self, render_object: RenderObject) -> Result<bool, PanelError> {
         if !self.area.overlaps_with(&render_object.get_area()) {
             println!(
                 "No overlap for object with coord: {}",
@@ -234,7 +241,12 @@ mod tests {
         handler::{memory_handle::MemoryHandle, shared_handle::SharedHandle},
         panel::command_enum::PanelCommandEnum,
         rendering::{render_object::RenderObject, sprite::Sprite},
-        shared::{frame::Frame, square::Square, usize2d::Usize2d, usize3d::Coord3d},
+        shared::{
+            frame::Frame,
+            square::Square,
+            usize2d::{Coord, Usize2d},
+            usize3d::Coord3d,
+        },
     };
 
     use super::Panel;
@@ -344,7 +356,7 @@ mod tests {
             let (_frame_sender, frame_receiver) = channel();
             let (_, command_receiver) = channel();
 
-            let panel = Panel::init(square, frame_receiver, command_receiver, Box::new(handle))
+            let mut panel = Panel::init(square, frame_receiver, command_receiver, Box::new(handle))
                 .expect("Failed to init the panel");
 
             let obj = RenderObject::new(Sprite::default(), object_coordinate);
@@ -360,6 +372,40 @@ mod tests {
                 i, expected, actual_string
             )
         }
+    }
+    #[test]
+    fn write_objects() {
+        let top_left = Coord::default();
+        let bottom_right = Coord::new(10, 10);
+        let square = Square::new(top_left, bottom_right);
+        let mem_handle = Arc::new(Mutex::new(MemoryHandle::new()));
+
+        let handle = SharedHandle::init(mem_handle.clone());
+        let (_frame_sender, frame_receiver) = channel();
+        let (_, command_receiver) = channel();
+
+        let mut panel = Panel::init(square, frame_receiver, command_receiver, Box::new(handle))
+            .expect("Failed to init the panel");
+        let object_coordinate_0 = Coord3d::new(0, 1, 0);
+        let obj_0 = RenderObject::new(Sprite::default(), object_coordinate_0);
+        let object_coordinate_1 = Coord3d::new(1, 1, 1);
+        let obj_1 = RenderObject::new(Sprite::default(), object_coordinate_1);
+        let object_coordinate_2 = Coord3d::new(9, 6, 1);
+        let obj_2 = RenderObject::new(Sprite::default(), object_coordinate_2);
+        let object_coordinate_3 = Coord3d::new(3, 2, 2);
+        let obj_3 = RenderObject::new(Sprite::default(), object_coordinate_3);
+        let _ = panel
+            .process_objects(vec![obj_0, obj_1, obj_2, obj_3])
+            .expect(&format!("Failed to write object to handle")[..]);
+
+        let actual_string = get_shared_mem_handle_content(mem_handle.clone());
+        let expected = "\nXX X\n  XX X\nXX  X \n   X X\n\n         X \n          X\n         X ";
+
+        assert_eq!(
+            actual_string, expected,
+            "Expected:\n{}\nGot:\n{}\n",
+            expected, actual_string
+        )
     }
     fn get_shared_mem_handle_content(handle: Arc<Mutex<MemoryHandle>>) -> String {
         let locked_writer_result = handle.lock();
