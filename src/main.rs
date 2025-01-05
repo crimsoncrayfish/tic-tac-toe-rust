@@ -29,6 +29,7 @@ pub mod shared {
     pub mod shared_errors;
     pub mod square;
     pub mod usize2d;
+    pub mod usize3d;
 }
 pub mod handler {
     pub mod handle;
