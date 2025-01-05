@@ -206,7 +206,7 @@ impl Panel {
         for index in 0..to_write.len() {
             let _ = self
                 .handle
-                .set_cursor_location(render_object.get_location() + Usize2d::new(0, index))
+                .set_cursor_location(render_object.get_location().as_2d() + Usize2d::new(0, index))
                 .map_err(|_| PanelError::WriteLocationFailed)?;
 
             // TODO: Switch colors
@@ -234,11 +234,7 @@ mod tests {
         handler::{memory_handle::MemoryHandle, shared_handle::SharedHandle},
         panel::command_enum::PanelCommandEnum,
         rendering::{render_object::RenderObject, sprite::Sprite},
-        shared::{
-            frame::Frame,
-            square::Square,
-            usize2d::{Coord, Usize2d},
-        },
+        shared::{frame::Frame, square::Square, usize2d::Usize2d, usize3d::Coord3d},
     };
 
     use super::Panel;
@@ -328,14 +324,14 @@ mod tests {
                 1,
                 Usize2d::default(),
                 Usize2d::new(100, 100),
-                Coord::new(10, 6),
+                Coord3d::new(10, 6, 1),
                 "\n\n\n\n\n\n          X X\n           X \n          X X",
             ),
             (
                 2,
                 Usize2d::new(3, 5),
                 Usize2d::new(10, 10),
-                Coord::new(9, 6),
+                Coord3d::new(9, 6, 1),
                 "\n\n\n\n\n\n         X \n          X\n         X ",
             ),
         ];

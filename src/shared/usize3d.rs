@@ -1,5 +1,7 @@
 use std::{fmt::Display, ops::Add};
 
+use super::usize2d::Usize2d;
+
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Usize3d {
     pub x: usize,
@@ -10,6 +12,24 @@ pub type Coord3d = Usize3d;
 impl Usize3d {
     pub fn new(x: usize, y: usize, z: usize) -> Self {
         Usize3d { x, y, z }
+    }
+    /// Returns the x and y coordinates as a `Usize2d`
+    ///
+    /// # Returns
+    ///
+    /// A new `Usize2d` that represents the current x and y coordinates
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let actual = Coord3d::new(10, 20);
+    /// let two_d = actual.as_2d();
+    /// ```
+    pub fn as_2d(self) -> Usize2d {
+        Usize2d {
+            x: self.x,
+            y: self.y,
+        }
     }
 }
 impl Display for Usize3d {
@@ -72,5 +92,12 @@ mod tests {
         assert_eq!(new.x, 40);
         assert_eq!(new.y, 30);
         assert_eq!(new.z, 51);
+    }
+    #[test]
+    fn as_2d() {
+        let actual = Coord3d::new(10, 20, 50);
+        let as_2d = actual.as_2d();
+        assert_eq!(as_2d.x, 10);
+        assert_eq!(as_2d.y, 20);
     }
 }

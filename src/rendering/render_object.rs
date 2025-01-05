@@ -1,15 +1,32 @@
 use crate::shared::{
-    frame::PixelGrid, shared_errors::SharedErrors, square::Square, usize2d::Coord,
+    frame::PixelGrid, shared_errors::SharedErrors, square::Square, usize2d::Coord, usize3d::Coord3d,
 };
 
 use super::sprite::Sprite;
 
 pub struct RenderObject {
-    coordinate: Coord,
+    coordinate: Coord3d,
     sprite: Sprite,
 }
 impl RenderObject {
-    pub fn new(sprite: Sprite, coord: Coord) -> Self {
+    /// Get a new instance of the `RenderObject`
+    ///
+    /// # Arguments
+    ///
+    /// * `sprite` - a `Sprite` to be rendered
+    /// * `coord` - a coordinate in 3d space. Objects with higher z coordinates will be rendered on
+    /// top of objects with smaller z coordinates
+    ///
+    /// # Returns
+    ///
+    /// A new `RenderObject`
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let object = RenderObject::new(Sprite::default(), Coord3d::default());
+    /// ```
+    pub fn new(sprite: Sprite, coord: Coord3d) -> Self {
         RenderObject {
             sprite,
             coordinate: coord,
@@ -24,7 +41,7 @@ impl RenderObject {
             ),
         )
     }
-    pub fn get_location(&self) -> Coord {
+    pub fn get_location(&self) -> Coord3d {
         self.coordinate
     }
 
@@ -46,6 +63,7 @@ impl RenderObject {
     /// let content_to_write: Vec<Vec<u8>> = render_object.get_content_to_write(clamp);
     /// ```
     pub fn get_content_to_write(&self, clamp: Square) -> Result<PixelGrid, SharedErrors> {
-        self.sprite.get_content_for_area(self.coordinate, clamp)
+        self.sprite
+            .get_content_for_area(self.coordinate.as_2d(), clamp)
     }
 }
