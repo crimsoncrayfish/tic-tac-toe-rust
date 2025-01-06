@@ -6,7 +6,12 @@ use std::{
 use crate::{
     handler::handle::Handle,
     rendering::render_object::RenderObject,
-    shared::{frame::Frame, square::Square, usize2d::Usize2d},
+    shared::{
+        frame::{Frame, PixelGrid},
+        shared_errors::SharedErrors,
+        square::Square,
+        usize2d::Usize2d,
+    },
 };
 
 use super::{command_enum::PanelCommandEnum, errors::PanelError, state::PanelState};
@@ -131,7 +136,8 @@ impl Panel {
     ) -> Result<(), PanelError> {
         render_objects.sort_by_key(|k| k.get_location().z);
         for object in render_objects {
-            let _was_written = self.write_object(object)?;
+            let _was_written = self.write_object(object);
+
             // TODO: log when an object was not written
         }
         Ok(())
@@ -195,21 +201,16 @@ impl Panel {
     /// assert!(result.is_ok());
     ///
     /// ```
-    fn write_object(&mut self, render_object: RenderObject) -> Result<bool, PanelError> {
+    fn write_object(&mut self, render_object: RenderObject) -> Result<(), PanelError> {
         if !self.area.overlaps_with(&render_object.get_area()) {
-            println!(
-                "No overlap for object with coord: {}",
-                render_object.get_location()
-            );
-            println!("Panel area: {}", self.area);
-            println!("Object area: {}", render_object.get_area());
             return Err(PanelError::OutOfBounds);
         }
-        let to_write: Frame = match render_object.get_content_to_write(self.area.clone()) {
-            Ok(w) => w,
-            Err(_) => return Ok(false),
-        };
-
+        let to_write: PixelGrid = render_object
+            .get_content_to_write(self.area.clone())
+            .map_err(|e| match e {
+                SharedErrors::OutOfBounds => PanelError::OutOfBounds,
+                _ => PanelError::BadRenderObject,
+            })?;
         for index in 0..to_write.len() {
             let _ = self
                 .handle
@@ -223,9 +224,9 @@ impl Panel {
                 .write(&to_write.get_chars()[index])
                 .map_err(|_| PanelError::WriteFailed)?;
         }
-        let _ = self.handle.flush();
+        self.handle.flush().map_err(|_| PanelError::WriteFailed)?;
 
-        Ok(true)
+        Ok(())
     }
 }
 
@@ -394,8 +395,10 @@ mod tests {
         let obj_2 = RenderObject::new(Sprite::default(), object_coordinate_2);
         let object_coordinate_3 = Coord3d::new(3, 2, 2);
         let obj_3 = RenderObject::new(Sprite::default(), object_coordinate_3);
+        let object_coordinate_4 = Coord3d::new(13, 12, 2);
+        let obj_4 = RenderObject::new(Sprite::default(), object_coordinate_4);
         let _ = panel
-            .process_objects(vec![obj_0, obj_1, obj_2, obj_3])
+            .process_objects(vec![obj_0, obj_1, obj_2, obj_3, obj_4])
             .expect(&format!("Failed to write object to handle")[..]);
 
         let actual_string = get_shared_mem_handle_content(mem_handle.clone());
