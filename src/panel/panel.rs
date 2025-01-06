@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    handler::handle::Handle,
+    handler::{handle::Handle, memory_handle::MemoryHandle},
     rendering::render_object::RenderObject,
     shared::{
         frame::{Frame, PixelGrid},
@@ -33,7 +33,8 @@ pub struct Panel {
     frame_receiver: Receiver<Vec<RenderObject>>,
     command_receiver: Receiver<PanelCommandEnum>,
     state: PanelState,
-    handle: Box<dyn Handle>,
+    frame_handle: MemoryHandle,
+    out_handle: Box<dyn Handle>,
 }
 impl Panel {
     /// Initialize an instance of Window
@@ -76,7 +77,8 @@ impl Panel {
             frame_receiver,
             command_receiver,
             state: PanelState::default(),
-            handle,
+            frame_handle: handle,
+            out_handle: handle,
         })
     }
 
@@ -136,6 +138,7 @@ impl Panel {
     ) -> Result<(), PanelError> {
         render_objects.sort_by_key(|k| k.get_location().z);
         for object in render_objects {
+            // TODO: This should write to the current frame in stead of the Handle
             let _was_written = self.write_object(object);
 
             // TODO: log when an object was not written
@@ -218,7 +221,6 @@ impl Panel {
                 .map_err(|_| PanelError::WriteLocationFailed)?;
 
             // TODO: Switch colors
-            println!("Coordinate: {}", render_object.get_location());
             let _ = self
                 .handle
                 .write(&to_write.get_chars()[index])
