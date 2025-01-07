@@ -30,6 +30,7 @@ pub mod shared {
     pub mod square;
     pub mod usize2d;
     pub mod usize3d;
+    pub mod vec2d;
 }
 pub mod handler {
     pub mod handle;
