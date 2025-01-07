@@ -73,6 +73,9 @@ fn write_vec_2d<T: Copy>(
 
 #[cfg(test)]
 mod write_vec_to_vec_tests {
+
+    use std::panic::catch_unwind;
+
     use crate::{
         rendering::colors::TerminalColors,
         shared::usize2d::Coord,
@@ -168,38 +171,88 @@ mod write_vec_to_vec_tests {
 
     #[test]
     fn write_u8_to_location_scenarios_2d() {
-        let test_cases: Vec<(&str, &str, Coord, &str)> = vec![
-            ("Hello      ", "World", Coord::new(6, 0), "Hello World"),
-            ("Hello\n     ", "World", Coord::new(0, 1), "Hello\nWorld"),
+        let test_cases: Vec<(&str, &str, Coord, &str, bool)> = vec![
+            (
+                "Hello      ",
+                "World",
+                Coord::new(6, 0),
+                "Hello World",
+                true,
+            ),
+            (
+                "Hello\n     ",
+                "World",
+                Coord::new(0, 1),
+                "Hello\nWorld",
+                true,
+            ),
             (
                 "Hello\n     \n          ",
                 "World",
                 Coord::new(5, 2),
                 "Hello\n     \n     World",
+                true,
+            ),
+            (
+                "Hello\n     \n          ",
+                "World",
+                Coord::new(15, 2),
+                "Hello\n     \n     World",
+                false,
             ),
         ];
 
-        for (i, (original_string, to_write_string, location, expected)) in
+        for (i, (original_string, to_write_string, location, expected, expect_success)) in
             test_cases.iter().enumerate()
         {
-            let mut original_vec = original_string
-                .lines()
-                .map(|l| l.bytes().collect())
-                .collect();
             let to_write = to_write_string
                 .lines()
                 .map(|l| l.bytes().collect())
                 .collect();
 
-            write_vec_2d(&mut original_vec, to_write, *location, b' ');
+            if *expect_success {
+                let mut original_vec = original_string
+                    .lines()
+                    .map(|l| l.bytes().collect())
+                    .collect();
+                write_vec_2d(&mut original_vec, to_write, *location, b' ');
 
-            let result_string = vec_vec_u8_to_string!(original_vec);
+                let result_string = vec_vec_u8_to_string!(original_vec);
 
-            assert_eq!(
-                result_string, *expected,
-                "Test case {}: Got: {:?}, Expected: {:?}",
-                i, result_string, expected
-            );
+                assert_eq!(
+                    result_string, *expected,
+                    "Test case {}: Got: {:?}, Expected: {:?}",
+                    i, result_string, expected
+                );
+            } else {
+                let result = catch_unwind(|| {
+                    let mut original_vec = original_string
+                        .lines()
+                        .map(|l| l.bytes().collect())
+                        .collect();
+                    write_vec_2d(&mut original_vec, to_write, *location, b' ');
+                });
+
+                assert!(result.is_err(), "Expected panic, but no panic occurred");
+
+                if let Err(err) = result {
+                    if let Some(message) = err.downcast_ref::<String>() {
+                        assert!(
+                            message.contains("The Vec should be initialized to the right size"),
+                            "Panic message did not match expected format: {}",
+                            message
+                        );
+                    } else if let Some(message) = err.downcast_ref::<&str>() {
+                        assert!(
+                            message.contains("The Vec should be initialized to the right size"),
+                            "Panic message did not match expected format: {}",
+                            message
+                        );
+                    } else {
+                        panic!("Panic payload was not a String or &str");
+                    }
+                }
+            }
         }
     }
 }
