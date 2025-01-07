@@ -33,7 +33,6 @@ pub struct Panel {
     frame_receiver: Receiver<Vec<RenderObject>>,
     command_receiver: Receiver<PanelCommandEnum>,
     state: PanelState,
-    frame_handle: MemoryHandle,
     out_handle: Box<dyn Handle>,
 }
 impl Panel {
@@ -77,7 +76,6 @@ impl Panel {
             frame_receiver,
             command_receiver,
             state: PanelState::default(),
-            frame_handle: handle,
             out_handle: handle,
         })
     }
@@ -216,17 +214,19 @@ impl Panel {
             })?;
         for index in 0..to_write.len() {
             let _ = self
-                .handle
+                .out_handle
                 .set_cursor_location(render_object.get_location().as_2d() + Usize2d::new(0, index))
                 .map_err(|_| PanelError::WriteLocationFailed)?;
 
             // TODO: Switch colors
             let _ = self
-                .handle
+                .out_handle
                 .write(&to_write.get_chars()[index])
                 .map_err(|_| PanelError::WriteFailed)?;
         }
-        self.handle.flush().map_err(|_| PanelError::WriteFailed)?;
+        self.out_handle
+            .flush()
+            .map_err(|_| PanelError::WriteFailed)?;
 
         Ok(())
     }

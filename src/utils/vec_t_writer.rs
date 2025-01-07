@@ -1,53 +1,83 @@
 use std::usize;
 
+use crate::shared::usize2d::Coord;
+
 /// Write to an existing `Vec<T>` with a new `Vec<T>` where T is the type
 ///
 /// # Arguments
 ///
-/// * `original` - a `Vec<T>` that needs to be updated
-/// * `string_to_write` - a `Vec<T>` that needs to be inserted
+/// * `original` - a `&mut Vec<T>` that needs to be updated
+/// * `to_write` - a `Vec<T>` that needs to be inserted
 /// * `index` - the starting index where the new string needs to be written to
 /// * `default` - the value used to pad the vec when writing to a new location
-///
-/// # Returns
-///
-/// A new `Vec<T>` e.g.
-/// 'the original', 'new string', 4 => 'the new string'
 ///
 /// # Examples
 ///
 /// ```
-/// let original_vec: Vec<u8> = "original".as_bytes().to_vec();
+/// let mut original_vec: Vec<u8> = "original".as_bytes().to_vec();
 /// let to_write_vec: Vec<u8> = "new string".as_bytes().to_vec();
-/// let result = write_to_location(original_vec.clone(), to_write_vec.clone(), 4, b' ');
-/// assert_eq!(result, "orignew string".as_bytes().to_vec());
+/// write_vec(&mut original_vec, to_write_vec.clone(), 4, b' ');
+/// assert_eq!(original_vec, "orignew string".as_bytes().to_vec());
+/// ```
+pub fn write_vec<T: Copy>(original: &mut Vec<T>, vec_to_write: Vec<T>, index: usize, default: T) {
+    let required_len = index + vec_to_write.len();
+    if original.len() < required_len {
+        original.resize(required_len, default);
+    }
+
+    original[index..index + vec_to_write.len()].copy_from_slice(&vec_to_write);
+}
+
+/// Write a `Vec<Vec<T>>` to anoter `Vec<Vec<T>>` with a specific coordinate
+/// This method assumes that the original `Vec<Vec<T>>` is already at the right size
+///
+/// # Arguments
+///
+/// * `original` - a `&mut Vec<T>` that needs to be updated
+/// * `to_write` - a `Vec<T>` that needs to be inserted
+/// * `index` - the starting index where the new string needs to be written to
+/// * `default` - the value used to pad the vec when writing to a new location
+///
+/// # Examples
+///
+/// ```
+/// let original_vec: Vec<Vec<u8>> = vec!["original".as_bytes().to_vec()];
+/// let to_write_vec: Vec<Vec<u8>> = vec!["new string".as_bytes().to_vec()];
+/// write_vec_2d(original_vec.clone(), to_write_vec.clone(), Coord::new(4, 0), b' ');
+/// let expected : Vec<Vec<u8>> = vec!["orignew string".as_bytes().to_vec()];
+/// assert_eq!(original_vec, expected);
 /// ```
 ///
-pub fn write_vec_to_vec<T: Copy>(
-    original: Vec<T>,
-    vec_to_write: Vec<T>,
-    index: usize,
+fn write_vec_2d<T: Copy>(
+    original: &mut Vec<Vec<T>>,
+    vec_to_write: Vec<Vec<T>>,
+    coord: Coord,
     default: T,
-) -> Vec<T> {
-    let mut new_vec: Vec<T> = Vec::with_capacity(original.len().max(index + vec_to_write.len()));
-    if original.len() <= index {
-        new_vec.extend(original);
-        pad_vec(&mut new_vec, index, default);
-        new_vec.extend(vec_to_write);
-        return new_vec;
+) {
+    assert!(
+        original.len() >= coord.y + vec_to_write.len(),
+        "The Vec should be initialized to the right size"
+    );
+
+    let mut current_y = coord.y;
+    for row in vec_to_write {
+        assert!(
+            original[current_y].len() >= coord.x + row.len(),
+            "The Vec should be initialized to the right size"
+        );
+        write_vec::<T>(&mut original[current_y], row, coord.x, default);
+        current_y += 1;
     }
-    new_vec.extend_from_slice(&original[0..index]);
-    let written_len = vec_to_write.len();
-    new_vec.extend(vec_to_write);
-    if original.len() > (index + written_len) {
-        new_vec.extend_from_slice(&original[index + written_len..]);
-    }
-    new_vec
 }
 
 #[cfg(test)]
 mod write_vec_to_vec_tests {
-    use crate::{rendering::colors::TerminalColors, utils::vec_t_writer::write_vec_to_vec};
+    use crate::{
+        rendering::colors::TerminalColors,
+        shared::usize2d::Coord,
+        utils::vec_t_writer::{write_vec, write_vec_2d},
+        vec_vec_u8_to_string,
+    };
 
     #[test]
     fn write_u8_to_location_scenarios() {
@@ -63,14 +93,13 @@ mod write_vec_to_vec_tests {
         ];
 
         for (i, (original, to_write, location, expected)) in test_cases.iter().enumerate() {
-            let original_vec: Vec<u8> = original.as_bytes().to_vec();
+            let mut original_vec: Vec<u8> = original.as_bytes().to_vec();
             let to_write_vec: Vec<u8> = to_write.as_bytes().to_vec();
             let expected_vec: Vec<u8> = expected.as_bytes().to_vec();
 
-            let result =
-                write_vec_to_vec(original_vec.clone(), to_write_vec.clone(), *location, b' ');
+            write_vec(&mut original_vec, to_write_vec.clone(), *location, b' ');
 
-            let result_string = String::from_utf8(result.clone());
+            let result_string = String::from_utf8(original_vec.clone());
             let expected_string = String::from_utf8(expected_vec.clone());
 
             assert!(
@@ -85,7 +114,7 @@ mod write_vec_to_vec_tests {
             );
 
             assert_eq!(
-                result,
+                original_vec,
                 expected_vec,
                 "Test case {}: Got: {:?}, Expected: {:?}",
                 i,
@@ -120,17 +149,55 @@ mod write_vec_to_vec_tests {
         ];
 
         for (i, (original, to_write, location, expected)) in test_cases.iter().enumerate() {
-            let result = write_vec_to_vec(
-                original.clone(),
+            let mut original_vec = original.clone();
+            write_vec(
+                &mut original_vec,
                 to_write.clone(),
                 *location,
                 default.clone(),
             );
 
             assert_eq!(
-                &result, expected,
+                &original_vec, expected,
                 "Test case {}: Got: {:?}, Expected: {:?}",
-                i, result, expected
+                i, original_vec, expected
+            );
+        }
+    }
+
+    #[test]
+    fn write_u8_to_location_scenarios_2d() {
+        let test_cases: Vec<(&str, &str, Coord, &str)> = vec![
+            ("Hello      ", "World", Coord::new(6, 0), "Hello World"),
+            ("Hello\n     ", "World", Coord::new(0, 1), "Hello\nWorld"),
+            (
+                "Hello\n     \n          ",
+                "World",
+                Coord::new(5, 2),
+                "Hello\n     \n     World",
+            ),
+        ];
+
+        for (i, (original_string, to_write_string, location, expected)) in
+            test_cases.iter().enumerate()
+        {
+            let mut original_vec = original_string
+                .lines()
+                .map(|l| l.bytes().collect())
+                .collect();
+            let to_write = to_write_string
+                .lines()
+                .map(|l| l.bytes().collect())
+                .collect();
+
+            write_vec_2d(&mut original_vec, to_write, *location, b' ');
+
+            let result_string = vec_vec_u8_to_string!(original_vec);
+
+            assert_eq!(
+                result_string, *expected,
+                "Test case {}: Got: {:?}, Expected: {:?}",
+                i, result_string, expected
             );
         }
     }

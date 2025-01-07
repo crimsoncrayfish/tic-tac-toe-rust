@@ -7,7 +7,7 @@ use std::{
 use crate::{
     rendering::colors::TerminalColors,
     shared::usize2d::{Coord, Usize2d},
-    utils::vec_t_writer::{write_t_to_vec, write_vec_to_vec},
+    utils::vec_t_writer::{write_t_to_vec, write_vec},
 };
 
 use super::{handle::Handle, handle_error::HandleError};
@@ -94,8 +94,8 @@ impl Write for MemoryHandle {
             self.foreground_color_buffer_temp
                 .resize_with(required_len, Vec::new);
         }
-        self.buffer_temp[self.current_cursor_location.y] = write_vec_to_vec(
-            self.buffer_temp[self.current_cursor_location.y].clone(),
+        write_vec(
+            &mut self.buffer_temp[self.current_cursor_location.y],
             vec_to_push,
             self.current_cursor_location.x,
             b' ',

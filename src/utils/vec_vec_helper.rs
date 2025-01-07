@@ -1,3 +1,5 @@
+use crate::{shared::usize2d::Coord, utils::vec_t_writer::write_vec};
+
 pub fn assert_vecs_shape_match<T1, T2>(vec_1: &Vec<Vec<T1>>, vec_2: &Vec<Vec<T2>>, message: &str) {
     assert!(vec_1.len() == vec_2.len(), "{}", message);
     for index in 0..vec_1.len() {
