@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, ops::Add};
 
 use super::usize2d::{Coord, Usize2d};
 
@@ -181,6 +181,65 @@ impl Square {
     /// ```
     pub fn get_boundary(&self) -> (Coord, Coord) {
         (self.top_left, self.bottom_right)
+    }
+    /// Get the start coordinates for the square
+    ///
+    /// # Returns
+    /// a `Coord` that represents the top_left coordinate of the `Square`
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let top_left= Usize2d::new(0, 0);
+    /// let bottom_right= Usize2d::new(10, 69);
+    /// let square= Square::new(top_left, bottom_right);
+    ///
+    /// let (top_left, bottom_right)= square.get_top_left();
+    /// ```
+    pub fn get_top_left(&self) -> Coord {
+        self.top_left
+    }
+    /// Move a square in 2 dimensions
+    ///
+    /// # Arguments
+    ///
+    /// * `amount` - the amount to move the square in space
+    ///
+    /// # Returns
+    /// a new `Square` that represents the current square moved by the specified amount
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let top_left= Usize2d::new(0, 0);
+    /// let bottom_right= Usize2d::new(10, 69);
+    /// let mut square= Square::new(top_left, bottom_right);
+    /// square.move(1,7);
+    /// ```
+    pub fn move_by(&mut self, amount: Usize2d) -> Self {
+        Square::new(self.top_left.add(amount), self.bottom_right.add(amount))
+    }
+    /// Move a square to the origin
+    ///
+    /// # Returns
+    /// a new `Square` that represents the current square moved to the origin
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let top_left= Usize2d::new(0, 0);
+    /// let bottom_right= Usize2d::new(10, 69);
+    /// let mut square= Square::new(top_left, bottom_right);
+    /// square.move_to_origin(1,7);
+    /// ```
+    pub fn move_to_origin(&mut self) -> Self {
+        Square::new(
+            Coord::default(),
+            Usize2d::new(
+                self.bottom_right.x - self.top_left.x,
+                self.bottom_right.y - self.top_left.y,
+            ),
+        )
     }
 }
 

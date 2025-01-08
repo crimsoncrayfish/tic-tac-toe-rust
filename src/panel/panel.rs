@@ -28,7 +28,7 @@ use super::{command_enum::PanelCommandEnum, errors::PanelError, state::PanelStat
 pub struct Panel {
     _previous_frame: Frame,
     next_frame: Frame,
-    area: Square,
+    area: Square, // TODO: DO i even want this since all objects are now relative to the panel
     frame_receiver: Receiver<Vec<RenderObject>>,
     command_receiver: Receiver<PanelCommandEnum>,
     state: PanelState,
@@ -202,11 +202,14 @@ impl Panel {
     ///
     /// ```
     fn write_object_next_frame(&mut self, render_object: RenderObject) -> Result<(), PanelError> {
-        if !self.area.overlaps_with(&render_object.get_area()) {
+        if !self
+            .area
+            .overlaps_with(&render_object.get_area().move_by(self.area.get_top_left()))
+        {
             return Err(PanelError::OutOfBounds);
         }
         let to_write: PixelGrid = render_object
-            .get_content_to_write(self.area.clone())
+            .get_content_to_write(self.area.move_to_origin())
             .map_err(|e| match e {
                 SharedErrors::OutOfBounds => PanelError::OutOfBounds,
                 _ => PanelError::BadRenderObject,
@@ -237,6 +240,7 @@ mod tests {
             usize2d::{Coord, Usize2d},
             usize3d::Coord3d,
         },
+        vec_vec_u8_to_string,
     };
 
     use super::Panel;
@@ -325,20 +329,31 @@ mod tests {
             (
                 1,
                 Usize2d::default(),
-                Usize2d::new(100, 100),
-                Coord3d::new(10, 6, 1),
-                "\n\n\n\n\n\n          X X\n           X \n          X X",
+                Usize2d::new(10, 10),
+                Coord3d::new(1, 1, 1),
+                "           \n X X       \n  X        \n X X       \n           \n           \n           \n           \n           \n           \n           ",
+                true
             ),
             (
                 2,
                 Usize2d::new(3, 5),
                 Usize2d::new(10, 10),
-                Coord3d::new(9, 6, 1),
-                "\n\n\n\n\n\n         X \n          X\n         X ",
+                Coord3d::new(6, 3, 1),
+                "        \n        \n        \n      X \n       X\n      X ",
+                true
             ),
+            (
+                3,
+                Usize2d::new(3, 5),
+                Usize2d::new(10, 10),
+                Coord3d::new(16, 3, 1),
+                "",
+               false 
+            ),
+
         ];
 
-        for (i, top_left, bottom_right, object_coordinate, expected) in test_cases {
+        for (i, top_left, bottom_right, object_coordinate, expected, in_bounds) in test_cases {
             let square = Square::new(top_left, bottom_right);
             let mem_handle = Arc::new(Mutex::new(MemoryHandle::new()));
 
@@ -350,17 +365,22 @@ mod tests {
                 .expect("Failed to init the panel");
 
             let obj = RenderObject::new(Sprite::default(), object_coordinate);
-            let _ = panel
-                .write_object_next_frame(obj)
-                .expect(&format!("Test case {} failed to write object to handle", i)[..]);
+            if in_bounds {
+                let _ = panel
+                    .write_object_next_frame(obj)
+                    .expect(&format!("Test case {} failed to write object to handle", i)[..]);
 
-            let actual_string = get_shared_mem_handle_content(mem_handle.clone());
+                let actual_string = vec_vec_u8_to_string!(panel.next_frame.get_chars());
 
-            assert_eq!(
-                actual_string, expected,
-                "Test case {} failed. Expected:\n{}\nGot:\n{}\n",
-                i, expected, actual_string
-            )
+                assert_eq!(
+                    actual_string, expected,
+                    "Test case {} failed. Expected:\n{}\nGot:\n{}\n",
+                    i, expected, actual_string
+                );
+            } else {
+                let result = panel.write_object_next_frame(obj);
+                assert!(result.is_err(), "object should be out of bounds");
+            }
         }
     }
     #[test]
