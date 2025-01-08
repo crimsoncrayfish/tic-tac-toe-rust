@@ -30,8 +30,8 @@ pub struct Square {
     top_left: Usize2d,
     bottom_right: Usize2d,
 
-    top_right: Usize2d,
-    bottom_left: Usize2d,
+    _top_right: Usize2d,
+    _bottom_left: Usize2d,
 }
 
 impl Square {
@@ -68,9 +68,9 @@ impl Square {
         );
         Square {
             top_left: top_left.clone(),
-            top_right: Usize2d::new(bottom_right.x, top_left.y),
+            _top_right: Usize2d::new(bottom_right.x, top_left.y),
             bottom_right: bottom_right.clone(),
-            bottom_left: Usize2d::new(top_left.x, bottom_right.y),
+            _bottom_left: Usize2d::new(top_left.x, bottom_right.y),
         }
     }
 

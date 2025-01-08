@@ -1,6 +1,12 @@
+use std::fmt::{Display, Formatter, Result};
+
 use crate::{
-    rendering::colors::TerminalColors as TC, utils::vec_vec_helper::assert_vecs_shape_match,
+    rendering::colors::TerminalColors as TC,
+    utils::{vec_t_writer::write_vec_2d, vec_vec_helper::assert_vecs_shape_match},
+    vec_vec_enum_to_string, vec_vec_u8_to_string,
 };
+
+use super::usize2d::{Coord, Usize2d};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PixelGrid {
@@ -10,12 +16,26 @@ pub struct PixelGrid {
 }
 pub type Frame = PixelGrid;
 
+impl Display for PixelGrid {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(
+            f,
+            "[PixelGrid with x {} and y {}]\nchars:\n{}\nfg:\n{}\nbg:\n{}",
+            self.width(),
+            self.len(),
+            vec_vec_u8_to_string!(self.chars),
+            vec_vec_enum_to_string!(self.foreground_colors),
+            vec_vec_enum_to_string!(self.background_colors)
+        )
+    }
+}
+
 impl Default for PixelGrid {
     fn default() -> Self {
         Self {
-            chars: Vec::new(),
-            background_colors: Vec::new(),
-            foreground_colors: Vec::new(),
+            chars: vec![vec![b' '; 1]; 1],
+            background_colors: vec![vec![TC::Default; 1]; 1],
+            foreground_colors: vec![vec![TC::Default; 1]; 1],
         }
     }
 }
@@ -149,6 +169,93 @@ impl PixelGrid {
     pub fn len(&self) -> usize {
         self.chars.len()
     }
+    /// Get the number of cols for the frame
+    ///
+    /// # Returns
+    ///
+    /// the `usize` representing the width of the chars `Vec<Vec<u8>>` which should have the same
+    /// width as the background and foreground colores
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let frame = Frame::new(vec![vec![b'a']], vec![vec![TerminalColors::Red]], vec![vec![TerminalColors::Blue]]);
+    /// let width = frame.width();
+    ///
+    /// ```
+    pub fn width(&self) -> usize {
+        self.chars[0].len()
+    }
+
+    /// Write one `PixelGrid` to another `PixelGrid` with a coordinate
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - the other `PixelGrid`
+    /// * `coord` - the starting coordinate for where the new `PixelGrid` should be written to
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let frame = Frame::new(vec![vec![b'a']], vec![vec![TerminalColors::Red]], vec![vec![TerminalColors::Blue]]);
+    /// let frame2 = Frame::new(vec![vec![b'b']], vec![vec![TerminalColors::Red]], vec![vec![TerminalColors::Blue]]);
+    /// frame.write(frame2, Coord::default());
+    /// ```
+    pub fn write(&mut self, other: PixelGrid, coord: Coord) {
+        assert!(self.len() >= other.len() + coord.y,"length of the Pixelgrid being written plus the coordinate should not exceed the current Pixelgrid");
+        assert!(self.width() >= other.width() + coord.x,"width of the Pixelgrid being written plus the coordinate should not exceed the current Pixelgrid");
+        write_vec_2d(&mut self.chars, other.chars, coord, b' ');
+        write_vec_2d(
+            &mut self.background_colors,
+            other.background_colors,
+            coord,
+            TC::Default,
+        );
+        write_vec_2d(
+            &mut self.foreground_colors,
+            other.foreground_colors,
+            coord,
+            TC::Default,
+        );
+    }
+
+    /// Get a subsection of the current `PixelGrid`
+    ///
+    /// # Arguments
+    ///
+    /// * `x_start` - the starting x location
+    /// * `x_end` - the end x location
+    /// * `y_start` - the starting y location
+    /// * `y_end` - the ending y location
+    ///
+    /// # Returns
+    ///
+    /// A new `PixelGrid` that represents the subsection of the current `PixelGrid` as described by
+    /// the coordinates
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let frame = Frame::new(vec![vec![b'a']], vec![vec![TerminalColors::Red]], vec![vec![TerminalColors::Blue]]);
+    /// let sub_frame = frame.sub_frame(Coord::default(), Coord::new(1,1));
+    ///
+    /// ```
+    pub fn sub_frame(&self, start: Usize2d, end: Usize2d) -> Self {
+        PixelGrid::new(
+            self.chars[start.y..=end.y]
+                .iter()
+                .map(|row| row[start.x..=end.x].to_vec())
+                .collect(),
+            self.foreground_colors[start.y..=end.y]
+                .iter()
+                .map(|row| row[start.x..=end.x].to_vec())
+                .collect(),
+            self.background_colors[start.y..=end.y]
+                .iter()
+                .map(|row| row[start.x..=end.x].to_vec())
+                .collect(),
+        )
+    }
 }
 
 #[cfg(test)]
@@ -158,9 +265,10 @@ mod tests {
     #[test]
     fn default() {
         let actual = Frame::default();
-        assert_eq!(actual.chars, Vec::<Vec<u8>>::new());
-        assert_eq!(actual.background_colors, Vec::<Vec<TC>>::new());
-        assert_eq!(actual.foreground_colors, Vec::<Vec<TC>>::new());
+
+        assert_eq!(actual.chars, vec![vec![b' '; 1]; 1]);
+        assert_eq!(actual.background_colors, vec![vec![TC::Default; 1]; 1]);
+        assert_eq!(actual.foreground_colors, vec![vec![TC::Default; 1]; 1]);
     }
 
     #[test]
@@ -206,5 +314,180 @@ mod tests {
         let bc = vec![vec![TC::Red, TC::Black]];
         let actual = Frame::new(chars.clone(), bc.clone(), fc.clone());
         assert_eq!(actual.len(), 1);
+    }
+    #[test]
+    fn write() {
+        let mut frame = Frame::default_with_size(7, 8);
+        let chars = vec![vec![b'x', b'x'], vec![b'x', b'x']];
+        let fc = vec![vec![TC::Black, TC::Red], vec![TC::Black, TC::Red]];
+        let bc = vec![vec![TC::Red, TC::Black], vec![TC::Red, TC::Black]];
+        let to_write = Frame::new(chars.clone(), bc.clone(), fc.clone());
+        frame.write(to_write, Coord::new(3, 5));
+
+        let expected = Frame::new(
+            vec![
+                "       ".as_bytes().to_vec(),
+                "       ".as_bytes().to_vec(),
+                "       ".as_bytes().to_vec(),
+                "       ".as_bytes().to_vec(),
+                "       ".as_bytes().to_vec(),
+                "   xx  ".as_bytes().to_vec(),
+                "   xx  ".as_bytes().to_vec(),
+                "       ".as_bytes().to_vec(),
+            ],
+            vec![
+                vec![
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                ],
+                vec![
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                ],
+                vec![
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                ],
+                vec![
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                ],
+                vec![
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                ],
+                vec![
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Red,
+                    TC::Black,
+                    TC::Default,
+                    TC::Default,
+                ],
+                vec![
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Red,
+                    TC::Black,
+                    TC::Default,
+                    TC::Default,
+                ],
+                vec![
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                ],
+            ],
+            vec![
+                vec![
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                ],
+                vec![
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                ],
+                vec![
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                ],
+                vec![
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                ],
+                vec![
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                ],
+                vec![
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Black,
+                    TC::Red,
+                    TC::Default,
+                    TC::Default,
+                ],
+                vec![
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Black,
+                    TC::Red,
+                    TC::Default,
+                    TC::Default,
+                ],
+                vec![
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                    TC::Default,
+                ],
+            ],
+        );
+        assert_eq!(frame, expected, "Expected:\n{}\nGot:\n{}", expected, frame);
+    }
+    #[test]
+    fn sub_frame() {
+        assert!(false);
     }
 }

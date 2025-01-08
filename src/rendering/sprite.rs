@@ -2,7 +2,12 @@ use std::usize;
 
 use crate::{
     assert_r,
-    shared::{frame::PixelGrid, shared_errors::SharedErrors, square::Square, usize2d::Coord},
+    shared::{
+        frame::PixelGrid,
+        shared_errors::SharedErrors,
+        square::Square,
+        usize2d::{Coord, Usize2d},
+    },
 };
 
 use super::colors::TerminalColors as TC;
@@ -11,9 +16,7 @@ pub struct Sprite {
     _name: String,
     pub width: usize,
     pub height: usize,
-    chars: Vec<Vec<u8>>,
-    background_colors: Vec<Vec<TC>>,
-    foreground_colors: Vec<Vec<TC>>,
+    pixels: PixelGrid,
 }
 impl Default for Sprite {
     fn default() -> Self {
@@ -21,21 +24,23 @@ impl Default for Sprite {
             _name: "Default Sprite".to_string(),
             width: 3,
             height: 3,
-            chars: vec![
-                vec![b'X', b' ', b'X'],
-                vec![b' ', b'X', b' '],
-                vec![b'X', b' ', b'X'],
-            ],
-            background_colors: vec![
-                vec![TC::Red, TC::White, TC::Red],
-                vec![TC::White, TC::Red, TC::White],
-                vec![TC::Red, TC::White, TC::Red],
-            ],
-            foreground_colors: vec![
-                vec![TC::Red, TC::White, TC::Red],
-                vec![TC::White, TC::Red, TC::White],
-                vec![TC::Red, TC::White, TC::Red],
-            ],
+            pixels: PixelGrid::new(
+                vec![
+                    vec![b'X', b' ', b'X'],
+                    vec![b' ', b'X', b' '],
+                    vec![b'X', b' ', b'X'],
+                ],
+                vec![
+                    vec![TC::Red, TC::White, TC::Red],
+                    vec![TC::White, TC::Red, TC::White],
+                    vec![TC::Red, TC::White, TC::Red],
+                ],
+                vec![
+                    vec![TC::Red, TC::White, TC::Red],
+                    vec![TC::White, TC::Red, TC::White],
+                    vec![TC::Red, TC::White, TC::Red],
+                ],
+            ),
         }
     }
 }
@@ -88,9 +93,7 @@ impl Sprite {
             _name: name,
             width,
             height,
-            chars,
-            background_colors,
-            foreground_colors,
+            pixels: PixelGrid::new(chars, background_colors, foreground_colors),
         }
     }
     ///
@@ -138,20 +141,9 @@ impl Sprite {
             area_bottom_right.y,
         )?;
 
-        Ok(PixelGrid::new(
-            self.chars[y_start..=y_end]
-                .iter()
-                .map(|row| row[x_start..=x_end].to_vec())
-                .collect(),
-            self.foreground_colors[y_start..=y_end]
-                .iter()
-                .map(|row| row[x_start..=x_end].to_vec())
-                .collect(),
-            self.background_colors[y_start..=y_end]
-                .iter()
-                .map(|row| row[x_start..=x_end].to_vec())
-                .collect(),
-        ))
+        Ok(self
+            .pixels
+            .sub_frame(Usize2d::new(x_start, y_start), Usize2d::new(x_end, y_end)))
     }
 
     /// Helper function to get the start and end indexes in a range

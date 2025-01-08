@@ -4,13 +4,12 @@ use std::{
 };
 
 use crate::{
-    handler::{handle::Handle, memory_handle::MemoryHandle},
+    handler::handle::Handle,
     rendering::render_object::RenderObject,
     shared::{
         frame::{Frame, PixelGrid},
         shared_errors::SharedErrors,
         square::Square,
-        usize2d::Usize2d,
     },
 };
 
@@ -27,13 +26,13 @@ use super::{command_enum::PanelCommandEnum, errors::PanelError, state::PanelStat
 /// through a sender in the form of list of renderable sprites `Vec<RenderObject>`
 #[derive(Debug)]
 pub struct Panel {
-    previous_frame: Frame,
+    _previous_frame: Frame,
     next_frame: Frame,
     area: Square,
     frame_receiver: Receiver<Vec<RenderObject>>,
     command_receiver: Receiver<PanelCommandEnum>,
     state: PanelState,
-    out_handle: Box<dyn Handle>,
+    _out_handle: Box<dyn Handle>,
 }
 impl Panel {
     /// Initialize an instance of Window
@@ -70,13 +69,13 @@ impl Panel {
     ) -> Result<Self, PanelError> {
         let new_state = Frame::default_with_size(area.width(), area.height());
         Ok(Panel {
-            previous_frame: new_state.clone(),
+            _previous_frame: new_state.clone(),
             next_frame: new_state.clone(),
             area,
             frame_receiver,
             command_receiver,
             state: PanelState::default(),
-            out_handle: handle,
+            _out_handle: handle,
         })
     }
 
@@ -137,7 +136,7 @@ impl Panel {
         render_objects.sort_by_key(|k| k.get_location().z);
         for object in render_objects {
             // TODO: This should write to the current frame in stead of the Handle
-            let _was_written = self.write_object(object);
+            let _was_written = self.write_object_next_frame(object);
 
             // TODO: log when an object was not written
         }
@@ -202,7 +201,7 @@ impl Panel {
     /// assert!(result.is_ok());
     ///
     /// ```
-    fn write_object(&mut self, render_object: RenderObject) -> Result<(), PanelError> {
+    fn write_object_next_frame(&mut self, render_object: RenderObject) -> Result<(), PanelError> {
         if !self.area.overlaps_with(&render_object.get_area()) {
             return Err(PanelError::OutOfBounds);
         }
@@ -212,21 +211,9 @@ impl Panel {
                 SharedErrors::OutOfBounds => PanelError::OutOfBounds,
                 _ => PanelError::BadRenderObject,
             })?;
-        for index in 0..to_write.len() {
-            let _ = self
-                .out_handle
-                .set_cursor_location(render_object.get_location().as_2d() + Usize2d::new(0, index))
-                .map_err(|_| PanelError::WriteLocationFailed)?;
 
-            // TODO: Switch colors
-            let _ = self
-                .out_handle
-                .write(&to_write.get_chars()[index])
-                .map_err(|_| PanelError::WriteFailed)?;
-        }
-        self.out_handle
-            .flush()
-            .map_err(|_| PanelError::WriteFailed)?;
+        self.next_frame
+            .write(to_write, render_object.get_location().as_2d());
 
         Ok(())
     }
@@ -269,11 +256,11 @@ mod tests {
         let expected = Frame::default_with_size(11, 21);
 
         assert_eq!(
-            window.previous_frame,
+            window._previous_frame,
             expected,
             "Default initialization previous frame is wrong. Expected lenth: {}, Actual length: {}",
             expected.len(),
-            window.previous_frame.len()
+            window._previous_frame.len()
         );
         assert_eq!(
             window.next_frame,
@@ -319,7 +306,7 @@ mod tests {
 
         let handle = Panel::init_run_async(square, frame_receiver, command_receiver, handle);
 
-        //TODO: writer and write command
+        // TODO: writer and write command
 
         let result = command_sender.send(PanelCommandEnum::KillProcess);
         assert!(
@@ -364,7 +351,7 @@ mod tests {
 
             let obj = RenderObject::new(Sprite::default(), object_coordinate);
             let _ = panel
-                .write_object(obj)
+                .write_object_next_frame(obj)
                 .expect(&format!("Test case {} failed to write object to handle", i)[..]);
 
             let actual_string = get_shared_mem_handle_content(mem_handle.clone());

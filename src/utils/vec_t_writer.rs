@@ -1,7 +1,6 @@
 use std::usize;
 
 use crate::shared::usize2d::Coord;
-use crate::shared::vec2d::Vec2d;
 
 /// Write to an existing `Vec<T>` with a new `Vec<T>` where T is the type
 ///
@@ -49,9 +48,9 @@ pub fn write_vec<T: Copy>(original: &mut Vec<T>, vec_to_write: Vec<T>, index: us
 /// assert_eq!(original_vec, expected);
 /// ```
 ///
-fn write_vec_2d<T: Copy>(
-    original: &mut Vec2d<T>, //TODO: Do i like the type alias?
-    vec_to_write: Vec2d<T>,
+pub fn write_vec_2d<T: Copy>(
+    original: &mut Vec<Vec<T>>, //TODO: Do i like the type alias?
+    vec_to_write: Vec<Vec<T>>,
     coord: Coord,
     default: T,
 ) {
