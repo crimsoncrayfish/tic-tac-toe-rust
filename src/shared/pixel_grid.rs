@@ -1,4 +1,4 @@
-use std::fmt::{Display, Formatter, Result};
+use std::fmt::{Display, Formatter};
 
 use crate::{
     rendering::colors::TerminalColors as TC,
@@ -6,7 +6,10 @@ use crate::{
     vec_vec_enum_to_string, vec_vec_u8_to_string,
 };
 
-use super::usize2d::{Coord, Usize2d};
+use super::{
+    shared_errors::SharedErrors,
+    usize2d::{Coord, Usize2d},
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PixelGrid {
@@ -17,7 +20,7 @@ pub struct PixelGrid {
 pub type Frame = PixelGrid;
 
 impl Display for PixelGrid {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(
             f,
             "[PixelGrid with x {} and y {}]\nchars:\n{}\nfg:\n{}\nbg:\n{}",
@@ -199,9 +202,9 @@ impl PixelGrid {
     /// ```
     /// let frame = Frame::new(vec![vec![b'a']], vec![vec![TerminalColors::Red]], vec![vec![TerminalColors::Blue]]);
     /// let frame2 = Frame::new(vec![vec![b'b']], vec![vec![TerminalColors::Red]], vec![vec![TerminalColors::Blue]]);
-    /// frame.write(frame2, Coord::default());
+    /// frame.write_subframe(frame2, Coord::default());
     /// ```
-    pub fn write(&mut self, other: PixelGrid, coord: Coord) {
+    pub fn write_subframe(&mut self, other: PixelGrid, coord: Coord) {
         assert!(self.len() >= other.len() + coord.y,"length of the Pixelgrid being written plus the coordinate should not exceed the current Pixelgrid");
         assert!(self.width() >= other.width() + coord.x,"width of the Pixelgrid being written plus the coordinate should not exceed the current Pixelgrid");
         write_vec_2d(&mut self.chars, other.chars, coord, b' ');
@@ -241,6 +244,13 @@ impl PixelGrid {
     ///
     /// ```
     pub fn sub_frame(&self, start: Usize2d, end: Usize2d) -> Self {
+        assert!(start.x <= end.x);
+        assert!(start.y <= end.y);
+        assert!(self.len() > start.y);
+        assert!(self.len() > end.y);
+        assert!(self.width() > end.x);
+        assert!(self.width() > end.x);
+
         PixelGrid::new(
             self.chars[start.y..=end.y]
                 .iter()
@@ -260,6 +270,7 @@ impl PixelGrid {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
 
     #[test]
@@ -316,13 +327,13 @@ mod tests {
         assert_eq!(actual.len(), 1);
     }
     #[test]
-    fn write() {
+    fn write_sub_frame() {
         let mut frame = Frame::default_with_size(7, 8);
         let chars = vec![vec![b'x', b'x'], vec![b'x', b'x']];
         let fc = vec![vec![TC::Black, TC::Red], vec![TC::Black, TC::Red]];
         let bc = vec![vec![TC::Red, TC::Black], vec![TC::Red, TC::Black]];
         let to_write = Frame::new(chars.clone(), bc.clone(), fc.clone());
-        frame.write(to_write, Coord::new(3, 5));
+        frame.write_subframe(to_write, Coord::new(3, 5));
 
         let expected = Frame::new(
             vec![
@@ -493,7 +504,7 @@ mod tests {
         let fc = vec![vec![TC::Black, TC::Red], vec![TC::Black, TC::Red]];
         let bc = vec![vec![TC::Red, TC::Black], vec![TC::Red, TC::Black]];
         let to_write = Frame::new(chars.clone(), bc.clone(), fc.clone());
-        frame.write(to_write.clone(), Coord::new(3, 5));
+        frame.write_subframe(to_write.clone(), Coord::new(3, 5));
 
         let test_cases: Vec<(Usize2d, Usize2d, Frame)> = vec![
             (Usize2d::new(3, 5), Usize2d::new(4, 6), to_write),

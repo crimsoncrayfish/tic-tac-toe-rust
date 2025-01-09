@@ -49,7 +49,7 @@ pub fn write_vec<T: Copy>(original: &mut Vec<T>, vec_to_write: Vec<T>, index: us
 /// ```
 ///
 pub fn write_vec_2d<T: Copy>(
-    original: &mut Vec<Vec<T>>, //TODO: Do i like the type alias?
+    original: &mut Vec<Vec<T>>,
     vec_to_write: Vec<Vec<T>>,
     coord: Coord,
     default: T,
