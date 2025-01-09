@@ -3,7 +3,7 @@ use std::usize;
 use crate::{
     assert_r,
     shared::{
-        frame::PixelGrid,
+        pixel_grid::PixelGrid,
         shared_errors::SharedErrors,
         square::Square,
         usize2d::{Coord, Usize2d},

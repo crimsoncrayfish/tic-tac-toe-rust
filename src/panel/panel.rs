@@ -7,7 +7,7 @@ use crate::{
     handler::handle::Handle,
     rendering::render_object::RenderObject,
     shared::{
-        frame::{Frame, PixelGrid},
+        pixel_grid::{Frame, PixelGrid},
         shared_errors::SharedErrors,
         square::Square,
     },
@@ -235,7 +235,7 @@ mod tests {
         panel::command_enum::PanelCommandEnum,
         rendering::{render_object::RenderObject, sprite::Sprite},
         shared::{
-            frame::Frame,
+            pixel_grid::Frame,
             square::Square,
             usize2d::{Coord, Usize2d},
             usize3d::Coord3d,
@@ -409,9 +409,8 @@ mod tests {
         let _ = panel
             .process_objects(vec![obj_0, obj_1, obj_2, obj_3, obj_4])
             .expect(&format!("Failed to write object to handle")[..]);
-
-        let actual_string = get_shared_mem_handle_content(mem_handle.clone());
-        let expected = "\nXX X\n  XX X\nXX  X \n   X X\n\n         X \n          X\n         X ";
+        let actual_string = vec_vec_u8_to_string!(panel.next_frame.get_chars());
+        let expected = "           \nXX X       \n  XX X     \nXX  X      \n   X X     \n           \n         X \n          X\n         X \n           \n           ";
 
         assert_eq!(
             actual_string, expected,

@@ -1,6 +1,6 @@
 use crate::{
     panel::panel::Panel,
-    shared::{frame::Frame, usize2d::Usize2d},
+    shared::{pixel_grid::Frame, usize2d::Usize2d},
 };
 use std::sync::mpsc::{channel, Receiver, Sender};
 

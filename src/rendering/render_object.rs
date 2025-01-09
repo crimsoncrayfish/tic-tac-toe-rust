@@ -1,5 +1,6 @@
 use crate::shared::{
-    frame::PixelGrid, shared_errors::SharedErrors, square::Square, usize2d::Coord, usize3d::Coord3d,
+    pixel_grid::PixelGrid, shared_errors::SharedErrors, square::Square, usize2d::Coord,
+    usize3d::Coord3d,
 };
 
 use super::sprite::Sprite;

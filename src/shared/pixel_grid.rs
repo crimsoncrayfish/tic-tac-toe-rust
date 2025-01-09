@@ -246,11 +246,11 @@ impl PixelGrid {
                 .iter()
                 .map(|row| row[start.x..=end.x].to_vec())
                 .collect(),
-            self.foreground_colors[start.y..=end.y]
+            self.background_colors[start.y..=end.y]
                 .iter()
                 .map(|row| row[start.x..=end.x].to_vec())
                 .collect(),
-            self.background_colors[start.y..=end.y]
+            self.foreground_colors[start.y..=end.y]
                 .iter()
                 .map(|row| row[start.x..=end.x].to_vec())
                 .collect(),
@@ -488,6 +488,53 @@ mod tests {
     }
     #[test]
     fn sub_frame() {
-        assert!(false);
+        let mut frame = Frame::default_with_size(7, 8);
+        let chars = vec![vec![b'x', b'x'], vec![b'x', b'x']];
+        let fc = vec![vec![TC::Black, TC::Red], vec![TC::Black, TC::Red]];
+        let bc = vec![vec![TC::Red, TC::Black], vec![TC::Red, TC::Black]];
+        let to_write = Frame::new(chars.clone(), bc.clone(), fc.clone());
+        frame.write(to_write.clone(), Coord::new(3, 5));
+
+        let test_cases: Vec<(Usize2d, Usize2d, Frame)> = vec![
+            (Usize2d::new(3, 5), Usize2d::new(4, 6), to_write),
+            (
+                Usize2d::new(2, 4),
+                Usize2d::new(3, 5),
+                Frame::new(
+                    vec![vec![b' ', b' '], vec![b' ', b'x']],
+                    vec![vec![TC::Default, TC::Default], vec![TC::Default, TC::Red]],
+                    vec![vec![TC::Default, TC::Default], vec![TC::Default, TC::Black]],
+                ),
+            ),
+            (
+                Usize2d::new(2, 4),
+                Usize2d::new(4, 6),
+                Frame::new(
+                    vec![
+                        vec![b' ', b' ', b' '],
+                        vec![b' ', b'x', b'x'],
+                        vec![b' ', b'x', b'x'],
+                    ],
+                    vec![
+                        vec![TC::Default, TC::Default, TC::Default],
+                        vec![TC::Default, TC::Red, TC::Black],
+                        vec![TC::Default, TC::Red, TC::Black],
+                    ],
+                    vec![
+                        vec![TC::Default, TC::Default, TC::Default],
+                        vec![TC::Default, TC::Black, TC::Red],
+                        vec![TC::Default, TC::Black, TC::Red],
+                    ],
+                ),
+            ),
+        ];
+        for (start, end, expected) in test_cases {
+            let sub_frame = frame.sub_frame(start, end);
+            assert_eq!(
+                sub_frame, expected,
+                "Expected:\n{}\nGot:\n{}",
+                expected, sub_frame
+            );
+        }
     }
 }
