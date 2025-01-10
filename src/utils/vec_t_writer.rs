@@ -424,3 +424,27 @@ mod pad_vec_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod compare_write {
+
+    use super::{write_t_to_vec, write_vec};
+
+    #[test]
+    fn compare() {
+        let start_at = 5;
+        let length = 8;
+
+        let mut my_vec = vec![b' '; 20];
+
+        let other = write_t_to_vec(my_vec.clone(), b'X', start_at, length, b'Y');
+        write_vec(&mut my_vec, vec![b'X'; length], start_at, b'Y');
+
+        assert_eq!(
+            my_vec.clone(), other.clone(),
+            "The results of writing with these 2 methods should be the same.\nwrite_t_to_vec:\n{}\nwrite_vec:\n{}\n",
+            String::from_utf8(other).expect("Bytes should be valid utf8"), 
+            String::from_utf8(my_vec).expect("Bytes should be valid utf8")
+        );
+    }
+}
