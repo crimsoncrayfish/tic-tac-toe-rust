@@ -8,7 +8,7 @@ use std::{
 use crate::{
     rendering::colors::TerminalColors,
     shared::usize2d::{Coord, Usize2d},
-    utils::vec_t_writer::{write_t_to_vec, write_vec},
+    utils::vec_t_writer::write_vec,
 };
 
 use super::{handle::Handle, handle_error::HandleError};

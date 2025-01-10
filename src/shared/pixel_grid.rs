@@ -6,10 +6,7 @@ use crate::{
     vec_vec_enum_to_string, vec_vec_u8_to_string,
 };
 
-use super::{
-    shared_errors::SharedErrors,
-    usize2d::{Coord, Usize2d},
-};
+use super::usize2d::{Coord, Usize2d};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PixelGrid {

@@ -104,8 +104,8 @@ impl Panel {
                 },
                 Err(_) => {}
             };
-            // TODO: self.render_frame();
-            // TODO: self.push_frame();
+            self.write()?;
+
         }
         Ok(())
     }
@@ -173,7 +173,7 @@ impl Panel {
                 self._out_handle.set_background_color(self.next_frame.get_background_colors()[row_index][col_index]).map_err(|_| PanelError::WriteFailed)?;
                 self._out_handle.write(&[self.next_frame.get_chars()[row_index][col_index]]).map_err(|_| PanelError::WriteFailed)?;
             }
-            //process the row by comparing it to the previous frame?
+            // TODO: process the row by comparing it to the previous frame?
             //if similarity is > 70% write partial with cursor moves
             //if similarity is < 70% write full line
         }
