@@ -87,6 +87,13 @@ Responsibilities:
 ##### 4. Output Rendering
 - Write the entire generated output stream to the console in a single operation, minimizing I/O overhead and cursor repositioning.
 
+#### Visualization of step 3
+Given the following previous and next frames:
+![image](https://github.com/user-attachments/assets/6a1879d2-62d2-4920-afb1-6cb96d46cded)
+
+The following 3 outputs could be calculated to achieve the result:
+![image](https://github.com/user-attachments/assets/e091a8db-a32c-4633-93dd-c051a8af03f4)
+
 ---
 
 #### Notes
