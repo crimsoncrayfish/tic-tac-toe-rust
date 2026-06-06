@@ -1,12 +1,15 @@
 use std::{
-    sync::mpsc::Receiver,
-    thread::{spawn, JoinHandle},
+    ops::Add, sync::mpsc::Receiver, thread::{spawn, JoinHandle}
 };
 
 use crate::{
     handler::handle::Handle,
     rendering::render_object::RenderObject,
-    shared::{frame::Pixel, square::Square, usize2d::Usize2d},
+    shared::{
+        pixel_grid::{Frame, PixelGrid},
+        shared_errors::SharedErrors,
+        square::Square, usize2d::Coord,
+    },
 };
 
 use super::{command_enum::PanelCommandEnum, errors::PanelError, state::PanelState};
@@ -22,13 +25,13 @@ use super::{command_enum::PanelCommandEnum, errors::PanelError, state::PanelStat
 /// through a sender in the form of list of renderable sprites `Vec<RenderObject>`
 #[derive(Debug)]
 pub struct Panel {
-    _previous_frame: Vec<Vec<Pixel>>,
-    _next_frame: Vec<Vec<Pixel>>,
-    area: Square,
+    _previous_frame: Frame,
+    next_frame: Frame,
+    area: Square, // TODO: DO i even want this since all objects are now relative to the panel
     frame_receiver: Receiver<Vec<RenderObject>>,
     command_receiver: Receiver<PanelCommandEnum>,
     state: PanelState,
-    handle: Box<dyn Handle>,
+    _out_handle: Box<dyn Handle>,
 }
 impl Panel {
     /// Initialize an instance of Window
@@ -63,15 +66,15 @@ impl Panel {
         command_receiver: Receiver<PanelCommandEnum>,
         handle: Box<dyn Handle>,
     ) -> Result<Self, PanelError> {
-        let new_state = vec![vec![Pixel::default(); area.width()]; area.height()];
+        let new_state = Frame::default_with_size(area.width(), area.height());
         Ok(Panel {
             _previous_frame: new_state.clone(),
-            _next_frame: new_state.clone(),
+            next_frame: new_state.clone(),
             area,
             frame_receiver,
             command_receiver,
             state: PanelState::default(),
-            handle,
+            _out_handle: handle,
         })
     }
 
@@ -95,14 +98,14 @@ impl Panel {
             }
 
             match self.frame_receiver.try_recv() {
-                Ok(render_objects) => match self.process_frame(render_objects) {
+                Ok(render_objects) => match self.calculate_next_frame(render_objects) {
                     Ok(_) => {}
                     Err(e) => return Err(e),
                 },
                 Err(_) => {}
             };
-            // TODO: self.render_frame();
-            // TODO: self.push_frame();
+            self.write()?;
+
         }
         Ok(())
     }
@@ -125,10 +128,61 @@ impl Panel {
     /// ];
     /// window.process_frame(render_objects);
     /// ```
-    pub fn process_frame(&mut self, _render_objects: Vec<RenderObject>) -> Result<(), PanelError> {
-        // TODO: write the objects to the panel
+    pub fn calculate_next_frame(
+        &mut self,
+        mut render_objects: Vec<RenderObject>,
+    ) -> Result<(), PanelError> {
+        render_objects.sort_by_key(|k| k.get_location().z);
+        for object in render_objects {
+            // TODO: This should write to the current frame in stead of the Handle
+            let _was_written = self.write_object(object);
+
+            // TODO: log when an object was not written
+        }
         Ok(())
     }
+
+    /// Write the next frame to the handle
+    ///
+    /// #Returns
+    ///
+    /// A result indicating whether it was successfull 
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let window= Window::init(...);
+    /// let render_objects = vec![
+    ///     RenderObject {
+    ///         coordinate: Usize2d::default(),
+    ///         sprite: vec![
+    ///             "a".to_string(),
+    ///             "b".to_string(),
+    ///             "c".to_string(),
+    ///         ]
+    ///     }
+    /// ];
+    /// window.calculate_next_frame(render_objects);
+    /// window.write();
+    /// ```
+    pub fn write(&mut self) -> Result<(), PanelError> {
+        for row_index in 0..self.next_frame.len() {
+            self._out_handle.set_cursor_location(self.area.get_top_left().add(Coord::new(0, row_index))).map_err(|_| PanelError::WriteFailed)?;
+            for col_index in 0..self.next_frame.width() {
+                self._out_handle.set_foreground_color(self.next_frame.get_foreground_colors()[row_index][col_index]).map_err(|_| PanelError::WriteFailed)?;
+                self._out_handle.set_background_color(self.next_frame.get_background_colors()[row_index][col_index]).map_err(|_| PanelError::WriteFailed)?;
+                self._out_handle.write(&[self.next_frame.get_chars()[row_index][col_index]]).map_err(|_| PanelError::WriteFailed)?;
+            }
+            // TODO: process the row by comparing it to the previous frame?
+            //if similarity is > 70% write partial with cursor moves
+            //if similarity is < 70% write full line
+        }
+        self._out_handle.flush().map_err(|_| PanelError::WriteFailed)?;
+        self._previous_frame = std::mem::replace(&mut self.next_frame, Frame::default_with_size(self.area.width(), self.area.height()));
+
+        Ok(())
+    }
+
 
     /// Initialize and run on a new thread
     ///
@@ -188,37 +242,24 @@ impl Panel {
     /// assert!(result.is_ok());
     ///
     /// ```
-    fn write_object(mut self, render_object: RenderObject) -> Result<bool, PanelError> {
-        if !self.area.overlaps_with(&render_object.get_area()) {
-            println!(
-                "No overlap for object with coord: {}",
-                render_object.get_location()
-            );
-            println!("Panel area: {}", self.area);
-            println!("Object area: {}", render_object.get_area());
+    fn write_object(&mut self, render_object: RenderObject) -> Result<(), PanelError> {
+        if !self
+            .area
+            .overlaps_with(&render_object.get_area().move_by(self.area.get_top_left()))
+        {
             return Err(PanelError::OutOfBounds);
         }
-        let to_write: Vec<Vec<u8>> = match render_object.get_content_to_write(self.area.clone()) {
-            Ok(w) => w,
-            Err(_) => return Ok(false),
-        };
+        let to_write: PixelGrid = render_object
+            .get_content_to_write(self.area.move_to_origin())
+            .map_err(|e| match e {
+                SharedErrors::OutOfBounds => PanelError::OutOfBounds,
+                _ => PanelError::BadRenderObject,
+            })?;
 
-        for index in 0..to_write.len() {
-            let _ = self
-                .handle
-                .set_cursor_location(render_object.get_location() + Usize2d::new(0, index))
-                .map_err(|_| PanelError::WriteLocationFailed)?;
+        self.next_frame
+            .write_subframe(to_write, render_object.get_location().as_2d());
 
-            // TODO: Switch colors
-            println!("Coordinate: {}", render_object.get_location());
-            let _ = self
-                .handle
-                .write(&to_write[index])
-                .map_err(|_| PanelError::WriteFailed)?;
-        }
-        let _ = self.handle.flush();
-
-        Ok(true)
+        Ok(())
     }
 }
 
@@ -235,10 +276,12 @@ mod tests {
         panel::command_enum::PanelCommandEnum,
         rendering::{render_object::RenderObject, sprite::Sprite},
         shared::{
-            frame::Pixel,
+            pixel_grid::Frame,
             square::Square,
             usize2d::{Coord, Usize2d},
+            usize3d::Coord3d,
         },
+        vec_vec_u8_to_string,
     };
 
     use super::Panel;
@@ -255,7 +298,7 @@ mod tests {
         let window = Panel::init(square, frame_receiver, command_receiver, handle);
         assert!(window.is_ok());
         let window = window.unwrap();
-        let expected = vec![vec![Pixel::default(); 11]; 21];
+        let expected = Frame::default_with_size(11, 21);
 
         assert_eq!(
             window._previous_frame,
@@ -265,11 +308,11 @@ mod tests {
             window._previous_frame.len()
         );
         assert_eq!(
-            window._next_frame,
+            window.next_frame,
             expected,
             "Default initialization for next frame is wrong. Expected lenth: {}, Actual length: {}",
             expected.len(),
-            window._next_frame.len()
+            window.next_frame.len()
         );
     }
 
@@ -308,7 +351,7 @@ mod tests {
 
         let handle = Panel::init_run_async(square, frame_receiver, command_receiver, handle);
 
-        //TODO: writer and write command
+        // TODO: writer and write command
 
         let result = command_sender.send(PanelCommandEnum::KillProcess);
         assert!(
@@ -327,20 +370,31 @@ mod tests {
             (
                 1,
                 Usize2d::default(),
-                Usize2d::new(100, 100),
-                Coord::new(10, 6),
-                "\n\n\n\n\n\n          X X\n           X \n          X X",
+                Usize2d::new(10, 10),
+                Coord3d::new(1, 1, 1),
+                "           \n X X       \n  X        \n X X       \n           \n           \n           \n           \n           \n           \n           ",
+                true
             ),
             (
                 2,
                 Usize2d::new(3, 5),
                 Usize2d::new(10, 10),
-                Coord::new(9, 6),
-                "\n\n\n\n\n\n         X \n          X\n         X ",
+                Coord3d::new(6, 3, 1),
+                "        \n        \n        \n      X \n       X\n      X ",
+                true
             ),
+            (
+                3,
+                Usize2d::new(3, 5),
+                Usize2d::new(10, 10),
+                Coord3d::new(16, 3, 1),
+                "",
+               false 
+            ),
+
         ];
 
-        for (i, top_left, bottom_right, object_coordinate, expected) in test_cases {
+        for (i, top_left, bottom_right, object_coordinate, expected, in_bounds) in test_cases {
             let square = Square::new(top_left, bottom_right);
             let mem_handle = Arc::new(Mutex::new(MemoryHandle::new()));
 
@@ -348,22 +402,111 @@ mod tests {
             let (_frame_sender, frame_receiver) = channel();
             let (_, command_receiver) = channel();
 
-            let panel = Panel::init(square, frame_receiver, command_receiver, Box::new(handle))
+            let mut panel = Panel::init(square, frame_receiver, command_receiver, Box::new(handle))
                 .expect("Failed to init the panel");
 
             let obj = RenderObject::new(Sprite::default(), object_coordinate);
-            let _ = panel
-                .write_object(obj)
-                .expect(&format!("Test case {} failed to write object to handle", i)[..]);
+            if in_bounds {
+                let _ = panel
+                    .write_object(obj)
+                    .expect(&format!("Test case {} failed to write object to handle", i)[..]);
 
-            let actual_string = get_shared_mem_handle_content(mem_handle.clone());
+                let actual_string = vec_vec_u8_to_string!(panel.next_frame.get_chars());
 
-            assert_eq!(
-                actual_string, expected,
-                "Test case {} failed. Expected:\n{}\nGot:\n{}\n",
-                i, expected, actual_string
-            )
+                assert_eq!(
+                    actual_string, expected,
+                    "Test case {} failed. Expected:\n{}\nGot:\n{}\n",
+                    i, expected, actual_string
+                );
+            } else {
+                let result = panel.write_object(obj);
+                assert!(result.is_err(), "object should be out of bounds");
+            }
         }
+    }
+    #[test]
+    fn write_objects() {
+        let top_left = Coord::default();
+        let bottom_right = Coord::new(10, 10);
+        let square = Square::new(top_left, bottom_right);
+        let mem_handle = Arc::new(Mutex::new(MemoryHandle::new()));
+
+        let handle = SharedHandle::init(mem_handle.clone());
+        let (_frame_sender, frame_receiver) = channel();
+        let (_, command_receiver) = channel();
+
+        let mut panel = Panel::init(square, frame_receiver, command_receiver, Box::new(handle))
+            .expect("Failed to init the panel");
+        let object_coordinate_0 = Coord3d::new(0, 1, 0);
+        let obj_0 = RenderObject::new(Sprite::default(), object_coordinate_0);
+        let object_coordinate_1 = Coord3d::new(1, 1, 1);
+        let obj_1 = RenderObject::new(Sprite::default(), object_coordinate_1);
+        let object_coordinate_2 = Coord3d::new(9, 6, 1);
+        let obj_2 = RenderObject::new(Sprite::default(), object_coordinate_2);
+        let object_coordinate_3 = Coord3d::new(3, 2, 2);
+        let obj_3 = RenderObject::new(Sprite::default(), object_coordinate_3);
+        let object_coordinate_4 = Coord3d::new(13, 12, 2);
+        let obj_4 = RenderObject::new(Sprite::default(), object_coordinate_4);
+        let _ = panel
+            .calculate_next_frame(vec![obj_0, obj_1, obj_2, obj_3, obj_4])
+            .expect(&format!("Failed to write object to handle")[..]);
+        let actual_string = vec_vec_u8_to_string!(panel.next_frame.get_chars());
+        let expected = "           \nXX X       \n  XX X     \nXX  X      \n   X X     \n           \n         X \n          X\n         X \n           \n           ";
+
+        assert_eq!(
+            actual_string, expected,
+            "Expected:\n{}\nGot:\n{}\n",
+            expected, actual_string
+        )
+    }
+    #[test]
+    fn write() {
+        let top_left = Coord::default();
+        let bottom_right = Coord::new(10, 10);
+        let square = Square::new(top_left, bottom_right);
+        let mem_handle = Arc::new(Mutex::new(MemoryHandle::new()));
+
+        let handle = SharedHandle::init(mem_handle.clone());
+        let (_frame_sender, frame_receiver) = channel();
+        let (_, command_receiver) = channel();
+
+        let mut panel = Panel::init(square, frame_receiver, command_receiver, Box::new(handle))
+            .expect("Failed to init the panel");
+        let object_coordinate_0 = Coord3d::new(0, 1, 0);
+        let obj_0 = RenderObject::new(Sprite::default(), object_coordinate_0);
+        let object_coordinate_1 = Coord3d::new(1, 1, 1);
+        let obj_1 = RenderObject::new(Sprite::default(), object_coordinate_1);
+        let object_coordinate_2 = Coord3d::new(9, 6, 1);
+        let obj_2 = RenderObject::new(Sprite::default(), object_coordinate_2);
+        let object_coordinate_3 = Coord3d::new(3, 2, 2);
+        let obj_3 = RenderObject::new(Sprite::default(), object_coordinate_3);
+        let object_coordinate_4 = Coord3d::new(13, 12, 2);
+        let obj_4 = RenderObject::new(Sprite::default(), object_coordinate_4);
+        let _ = panel
+            .calculate_next_frame(vec![obj_0, obj_1, obj_2, obj_3, obj_4])
+            .expect(&format!("Failed to write object to handle")[..]);
+        let actual_string = vec_vec_u8_to_string!(panel.next_frame.get_chars());
+        let expected = "           \nXX X       \n  XX X     \nXX  X      \n   X X     \n           \n         X \n          X\n         X \n           \n           ";
+
+        assert_eq!(
+            actual_string, expected,
+            "Expected:\n{}\nGot:\n{}\n",
+            expected, actual_string
+        );
+        let actual = get_shared_mem_handle_content(mem_handle.clone());
+        assert_eq!(
+            actual, "",
+            "Written content: Expected:\n{}\nGot:\n{}\n",
+            "", actual
+        );
+        let result =panel.write();
+        assert!(result.is_ok());
+        let actual = get_shared_mem_handle_content(mem_handle);
+        assert_eq!(
+            actual, expected,
+            "Written content: Expected:\n{}\nGot:\n{}\n",
+            expected, actual
+        );
     }
     fn get_shared_mem_handle_content(handle: Arc<Mutex<MemoryHandle>>) -> String {
         let locked_writer_result = handle.lock();

@@ -1,49 +1,51 @@
-use std::io::Error;
-
-use crate::{
-    handler::handle::Handle,
-    shared::{
-        shared_errors::SharedErrors,
-        square::Square,
-        usize2d::{Coord, Usize2d},
-    },
+use crate::shared::{
+    pixel_grid::PixelGrid, shared_errors::SharedErrors, square::Square, usize2d::Coord,
+    usize3d::Coord3d,
 };
 
 use super::sprite::Sprite;
 
 pub struct RenderObject {
-    coordinate: Usize2d,
+    coordinate: Coord3d,
     sprite: Sprite,
 }
 impl RenderObject {
-    pub fn new(sprite: Sprite, location: Coord) -> Self {
+    /// Get a new instance of the `RenderObject`
+    ///
+    /// # Arguments
+    ///
+    /// * `sprite` - a `Sprite` to be rendered
+    /// * `coord` - a coordinate in 3d space. Objects with higher z coordinates will be rendered on
+    /// top of objects with smaller z coordinates
+    ///
+    /// # Returns
+    ///
+    /// A new `RenderObject`
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let object = RenderObject::new(Sprite::default(), Coord3d::default());
+    /// ```
+    pub fn new(sprite: Sprite, coord: Coord3d) -> Self {
         RenderObject {
             sprite,
-            coordinate: location,
+            coordinate: coord,
         }
     }
     pub fn get_area(&self) -> Square {
         Square::new(
-            Usize2d::new(self.coordinate.x, self.coordinate.y),
-            Usize2d::new(
+            Coord::new(self.coordinate.x, self.coordinate.y),
+            Coord::new(
                 self.coordinate.x + self.sprite.width - 1,
                 self.coordinate.y + self.sprite.width - 1,
             ),
         )
     }
-    pub fn get_location(&self) -> Usize2d {
+    pub fn get_location(&self) -> Coord3d {
         self.coordinate
     }
-    pub fn write_clamped(
-        &self,
-        _handle: &mut dyn Handle,
-        _clamp: Square,
-    ) -> Result<usize, std::io::Error> {
-        // TODO:let to_write = self.sprite.get_content_for_area(clamp, self.coordinate);
 
-        //handle.write(&to_write)
-        Err(Error::new(std::io::ErrorKind::Other, "TBI"))
-    }
     /// Get the content that should be written to the screen given the limitations i.t.o
     /// coordinates and available screen space
     ///
@@ -61,7 +63,8 @@ impl RenderObject {
     /// let clamp = Square::default();
     /// let content_to_write: Vec<Vec<u8>> = render_object.get_content_to_write(clamp);
     /// ```
-    pub fn get_content_to_write(&self, clamp: Square) -> Result<Vec<Vec<u8>>, SharedErrors> {
-        self.sprite.get_content_for_area(self.coordinate, clamp)
+    pub fn get_content_to_write(&self, clamp: Square) -> Result<PixelGrid, SharedErrors> {
+        self.sprite
+            .get_content_for_area(self.coordinate.as_2d(), clamp)
     }
 }

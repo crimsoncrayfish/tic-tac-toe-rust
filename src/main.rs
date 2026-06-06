@@ -6,6 +6,7 @@ pub mod utils {
     pub mod arg_helper;
     pub mod helper_macros;
     pub mod vec_t_writer;
+    pub mod vec_vec_helper;
 }
 
 pub mod coordination {
@@ -24,10 +25,11 @@ pub mod rendering {
 }
 
 pub mod shared {
-    pub mod frame;
+    pub mod pixel_grid;
     pub mod shared_errors;
     pub mod square;
     pub mod usize2d;
+    pub mod usize3d;
 }
 pub mod handler {
     pub mod handle;

@@ -1,13 +1,14 @@
 use std::{
     fmt::Debug,
     io::{self, Write},
+    ops::Add,
     usize,
 };
 
 use crate::{
     rendering::colors::TerminalColors,
     shared::usize2d::{Coord, Usize2d},
-    utils::vec_t_writer::{write_t_to_vec, write_vec_to_vec},
+    utils::vec_t_writer::write_vec,
 };
 
 use super::{handle::Handle, handle_error::HandleError};
@@ -84,7 +85,6 @@ impl Debug for MemoryHandle {
 impl Write for MemoryHandle {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let vec_to_push = buf.to_vec();
-        let len_to_push = vec_to_push.len();
 
         let required_len = self.current_cursor_location.y + 1;
         if self.buffer_temp.len() < required_len {
@@ -94,31 +94,33 @@ impl Write for MemoryHandle {
             self.foreground_color_buffer_temp
                 .resize_with(required_len, Vec::new);
         }
-        self.buffer_temp[self.current_cursor_location.y] = write_vec_to_vec(
-            self.buffer_temp[self.current_cursor_location.y].clone(),
+        write_vec(
+            &mut self.buffer_temp[self.current_cursor_location.y],
             vec_to_push,
             self.current_cursor_location.x,
             b' ',
         );
 
-        self.background_color_buffer_temp[self.current_cursor_location.y] = write_t_to_vec(
-            self.background_color_buffer_temp[self.current_cursor_location.y].clone(),
-            self.current_background_color,
-            len_to_push,
+        write_vec(
+            &mut self.background_color_buffer_temp[self.current_cursor_location.y],
+            vec![self.current_background_color; buf.len()],
             self.current_cursor_location.x,
-            TerminalColors::default(),
+            TerminalColors::Default,
+        );
+        write_vec(
+            &mut self.foreground_color_buffer_temp[self.current_cursor_location.y],
+            vec![self.current_foreground_color; buf.len()],
+            self.current_cursor_location.x,
+            TerminalColors::Default,
         );
 
-        self.foreground_color_buffer_temp[self.current_cursor_location.y] = write_t_to_vec(
-            self.foreground_color_buffer_temp[self.current_cursor_location.y].clone(),
-            self.current_foreground_color,
-            len_to_push,
-            self.current_cursor_location.x,
-            TerminalColors::default(),
-        );
+        let _ = self
+            .set_cursor_location(self.current_cursor_location.add(Coord::new(buf.len(), 0)))
+            .map_err(|_| std::io::ErrorKind::Interrupted);
 
         Ok(buf.len())
     }
+
     fn flush(&mut self) -> io::Result<()> {
         self.buffer = self.buffer_temp.clone();
         self.foreground_color_buffer = self.foreground_color_buffer_temp.clone();
@@ -296,12 +298,12 @@ mod tests {
                 TC::Default,
                 TC::Default,
                 TC::Default,
-                TC::Default,
-                TC::Default,
-                TC::Default,
-                TC::Default,
-                TC::Default,
-                TC::Default,
+                TC::Black,
+                TC::Black,
+                TC::Black,
+                TC::Black,
+                TC::Black,
+                TC::Black,
                 TC::Black,
                 TC::Black,
                 TC::Black,
@@ -327,12 +329,12 @@ mod tests {
                 TC::Default,
                 TC::Default,
                 TC::Default,
-                TC::Default,
-                TC::Default,
-                TC::Default,
-                TC::Default,
-                TC::Default,
-                TC::Default,
+                TC::Red,
+                TC::Red,
+                TC::Red,
+                TC::Red,
+                TC::Red,
+                TC::Red,
                 TC::Red,
                 TC::Red,
                 TC::Red,

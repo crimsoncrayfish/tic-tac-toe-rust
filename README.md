@@ -10,3 +10,6 @@
 ## Scope
 
 The proposed architecture can be found [here](https://github.com/crimsoncrayfish/tic-tac-toe-rust/wiki/Proposed-Architecture)
+
+
+

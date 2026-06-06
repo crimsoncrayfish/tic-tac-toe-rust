@@ -18,6 +18,23 @@ impl Display for Usize2d {
 }
 impl Add for Usize2d {
     type Output = Usize2d;
+    /// Add two Usize2d's together
+    ///
+    /// # Arguments
+    ///
+    /// * `rhs` - the `Usize2d` to add to the current one
+    ///
+    /// # Returns
+    ///
+    /// A new `Usize2d` that represents the two added together
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let actual = Coord::new(10, 20);
+    /// let to_add = Coord::new(30, 10);
+    /// let new = actual.add(to_add);
+    /// ```
     fn add(self, rhs: Self) -> Self::Output {
         Usize2d {
             x: self.x + rhs.x,
@@ -40,5 +57,13 @@ mod tests {
         let actual = Coord::new(10, 20);
         assert_eq!(actual.x, 10);
         assert_eq!(actual.y, 20);
+    }
+    #[test]
+    fn add() {
+        let actual = Coord::new(10, 20);
+        let to_add = Coord::new(30, 10);
+        let new = actual.add(to_add);
+        assert_eq!(new.x, 40);
+        assert_eq!(new.y, 30);
     }
 }
