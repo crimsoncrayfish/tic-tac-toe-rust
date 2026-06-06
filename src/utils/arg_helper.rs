@@ -20,11 +20,11 @@ use std::str::FromStr;
 /// let _x_len: usize = read_config(&args, "--x-len".to_string(), 10);
 ///
 /// ```
-pub fn read_config<T>(args: &Vec<String>, arg: String, default: T) -> T
+pub fn read_config<T>(args: &[String], arg: String, default: T) -> T
 where
     T: FromStr + Clone + Copy,
 {
-    let mut out: T = default.clone();
+    let mut out: T = default;
     for i in 1..args.len() {
         if args[i].as_str() != arg {
             continue;
@@ -46,21 +46,14 @@ mod tests {
 
     #[test]
     fn read_success() {
-        let mut args: Vec<String> = Vec::new();
-        args.push("--".to_string());
-        args.push("--test".to_string());
-        args.push("100".to_string());
-
+        let args: Vec<String> = vec!["--".to_string(), "--test".to_string(), "100".to_string()];
         let x: usize = read_config(&args, "--test".to_string(), 10000);
         assert_eq!(x, 100, "Expected value of 100");
     }
 
     #[test]
     fn read_failed() {
-        let mut args: Vec<String> = Vec::new();
-        args.push("--".to_string());
-        args.push("--test2".to_string());
-        args.push("100".to_string());
+        let args: Vec<String> = vec!["--".to_string(), "--test2".to_string(), "100".to_string()];
 
         let x: usize = read_config(&args, "test".to_string(), 10000);
         assert_eq!(x, 10000, "Expected value of 100");

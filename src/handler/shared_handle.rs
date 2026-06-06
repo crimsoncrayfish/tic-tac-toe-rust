@@ -18,7 +18,7 @@ impl SharedHandle {
     }
     pub fn init_std_out() -> Self {
         SharedHandle {
-            handle: Arc::new(Mutex::new(StdIOHandle::new())),
+            handle: Arc::new(Mutex::new(StdIOHandle::default())),
         }
     }
     pub fn write(&self, args: std::fmt::Arguments) -> Result<(), SharedWriterErr> {
@@ -107,7 +107,7 @@ impl Handle for SharedHandle {
         coord: crate::shared::usize2d::Coord,
     ) -> Result<usize, HandleError> {
         //TODO: What even
-        let _ = self.set_cursor_location(coord)?;
+        self.set_cursor_location(coord)?;
         self.write(buf).map_err(|_| HandleError::WriteFailed)
     }
 }
@@ -119,7 +119,7 @@ pub enum SharedWriterErr {
 impl Error for SharedWriterErr {}
 impl From<SharedWriterErr> for io::Error {
     fn from(err: SharedWriterErr) -> io::Error {
-        io::Error::new(io::ErrorKind::Other, err)
+        std::io::Error::other(err)
     }
 }
 impl From<SharedWriterErr> for HandleError {
@@ -147,12 +147,12 @@ mod tests {
 
     #[test]
     fn hello_world() {
-        let buffer = Arc::new(Mutex::new(MemoryHandle::new()));
+        let buffer = Arc::new(Mutex::new(MemoryHandle::default()));
         let writer = SharedHandle::init(buffer.clone());
         let test_str = "Hello world";
-        let _ = match writer.write(format_args!("{}", test_str)) {
+        match writer.write(format_args!("{}", test_str)) {
             Ok(_) => (),
-            Err(_) => assert!(false, "This should never happen"),
+            Err(_) => panic!("This should never happen"),
         };
         let result = writer.flush();
         assert!(result.is_ok());

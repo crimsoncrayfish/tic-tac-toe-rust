@@ -1,5 +1,3 @@
-use std::usize;
-
 use crate::shared::usize2d::Coord;
 
 /// Write to an existing `Vec<T>` with a new `Vec<T>` where T is the type
@@ -49,7 +47,7 @@ pub fn write_vec<T: Copy>(original: &mut Vec<T>, vec_to_write: Vec<T>, index: us
 /// ```
 ///
 pub fn write_vec_2d<T: Copy>(
-    original: &mut Vec<Vec<T>>,
+    original: &mut [Vec<T>],
     vec_to_write: Vec<Vec<T>>,
     coord: Coord,
     default: T,
@@ -84,7 +82,7 @@ mod write_vec_to_vec_tests {
 
     #[test]
     fn write_u8_to_location_scenarios() {
-        let test_cases = vec![
+        let test_cases = [
             ("Hello ", "World", 6, "Hello World"),
             ("Rust", " is great", 4, "Rust is great"),
             ("Foo Baz", "Bar", 0, "Bar Baz"),
@@ -130,7 +128,7 @@ mod write_vec_to_vec_tests {
     #[test]
     fn write_enum_to_location_scenarios() {
         let default = TerminalColors::Black;
-        let test_cases = vec![
+        let test_cases = [
             (
                 vec![TerminalColors::Red, TerminalColors::Black],
                 vec![TerminalColors::HotPink],
@@ -138,8 +136,8 @@ mod write_vec_to_vec_tests {
                 vec![
                     TerminalColors::Red,
                     TerminalColors::Black,
-                    default.clone(),
-                    default.clone(),
+                    default,
+                    default,
                     TerminalColors::HotPink,
                 ],
             ),
@@ -153,12 +151,7 @@ mod write_vec_to_vec_tests {
 
         for (i, (original, to_write, location, expected)) in test_cases.iter().enumerate() {
             let mut original_vec = original.clone();
-            write_vec(
-                &mut original_vec,
-                to_write.clone(),
-                *location,
-                default.clone(),
-            );
+            write_vec(&mut original_vec, to_write.clone(), *location, default);
 
             assert_eq!(
                 &original_vec, expected,
@@ -213,7 +206,7 @@ mod write_vec_to_vec_tests {
                 let mut original_vec = original_string
                     .lines()
                     .map(|l| l.bytes().collect())
-                    .collect();
+                    .collect::<Vec<Vec<u8>>>();
                 write_vec_2d(&mut original_vec, to_write, *location, b' ');
 
                 let result_string = vec_vec_u8_to_string!(original_vec);
@@ -228,7 +221,7 @@ mod write_vec_to_vec_tests {
                     let mut original_vec = original_string
                         .lines()
                         .map(|l| l.bytes().collect())
-                        .collect();
+                        .collect::<Vec<Vec<u8>>>();
                     write_vec_2d(&mut original_vec, to_write, *location, b' ');
                 });
 
@@ -295,7 +288,7 @@ pub fn write_t_to_vec<T: Copy>(
 
     let mut new: Vec<T> = Vec::with_capacity(original.len().max(index + len));
     new.extend_from_slice(&original[0..index]);
-    new.extend(std::iter::repeat(t_to_write).take(len));
+    new.extend(std::iter::repeat_n(t_to_write, len));
     if original.len() > len + index {
         new.extend_from_slice(&original[len + index..]);
     }
@@ -307,7 +300,7 @@ mod write_t_to_vec_tests {
 
     #[test]
     fn write_u8() {
-        let test_cases = vec![
+        let test_cases = [
             ("Hello", 6_usize, 4_usize, b'P', b'V', "HelloPVVVV"),
             ("Hello", 2_usize, 1_usize, b'P', b'V', "HeVlo"),
             ("Hello", 2_usize, 10_usize, b'P', b'V', "HeVVVVVVVVVV"),
@@ -377,7 +370,7 @@ pub fn pad_vec<T: Copy>(original: &mut Vec<T>, len: usize, default: T) {
     if len < original.len() {
         return;
     }
-    original.extend(std::iter::repeat(default).take(len - original.len()));
+    original.extend(std::iter::repeat_n(default, len - original.len()));
 }
 
 #[cfg(test)]
@@ -386,7 +379,7 @@ mod pad_vec_tests {
 
     #[test]
     fn pad() {
-        let test_cases = vec![
+        let test_cases = [
             ("Hello", 6_usize, b' ', "Hello "),
             ("Hello", 3_usize, b' ', "Hello"),
             ("Hello", 10_usize, b'A', "HelloAAAAA"),

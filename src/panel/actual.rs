@@ -88,24 +88,18 @@ impl Panel {
     /// ```
     pub fn run(&mut self) -> Result<(), PanelError> {
         loop {
-            match self.command_receiver.try_recv() {
-                Ok(cmd) => self.state.process_command(cmd),
-                Err(_) => (),
-            };
+            if let Ok(cmd) = self.command_receiver.try_recv() {
+                self.state.process_command(cmd)
+            }
 
             if self.state.is_killed {
                 break;
             }
 
-            match self.frame_receiver.try_recv() {
-                Ok(render_objects) => match self.calculate_next_frame(render_objects) {
-                    Ok(_) => {}
-                    Err(e) => return Err(e),
-                },
-                Err(_) => {}
-            };
+            if let Ok(render_objects) = self.frame_receiver.try_recv() {
+                self.calculate_next_frame(render_objects)?;
+            }
             self.write()?;
-
         }
         Ok(())
     }
@@ -291,7 +285,7 @@ mod tests {
         let top_left = Usize2d::new(0, 0);
         let bottom_right = Usize2d::new(10, 20);
         let square = Square::new(top_left, bottom_right);
-        let handle = Box::new(MemoryHandle::new());
+        let handle = Box::new(MemoryHandle::default());
         let (_, frame_receiver) = channel();
         let (_, command_receiver) = channel();
 
@@ -322,14 +316,14 @@ mod tests {
         let bottom_right = Usize2d::new(10, 20);
         let square = Square::new(top_left, bottom_right);
 
-        let handle = Box::new(MemoryHandle::new());
+        let handle = Box::new(MemoryHandle::default());
         let (_, frame_receiver) = channel();
         let (command_sender, command_receiver) = channel();
 
         let handle = Panel::init_run_async(square, frame_receiver, command_receiver, handle);
         let result = command_sender.send(PanelCommandEnum::KillProcess);
         assert!(
-            !result.is_err(),
+            result.is_ok(),
             "There should be no bugs when sending the kill command"
         );
         sleep(Duration::from_millis(100));
@@ -345,7 +339,7 @@ mod tests {
         let bottom_right = Usize2d::new(10, 20);
         let square = Square::new(top_left, bottom_right);
 
-        let handle = Box::new(MemoryHandle::new());
+        let handle = Box::new(MemoryHandle::default());
         let (_frame_sender, frame_receiver) = channel();
         let (command_sender, command_receiver) = channel();
 
@@ -355,7 +349,7 @@ mod tests {
 
         let result = command_sender.send(PanelCommandEnum::KillProcess);
         assert!(
-            !result.is_err(),
+            result.is_ok(),
             "There should be no bugs when sending the kill command"
         );
         sleep(Duration::from_millis(100));
@@ -396,7 +390,7 @@ mod tests {
 
         for (i, top_left, bottom_right, object_coordinate, expected, in_bounds) in test_cases {
             let square = Square::new(top_left, bottom_right);
-            let mem_handle = Arc::new(Mutex::new(MemoryHandle::new()));
+            let mem_handle = Arc::new(Mutex::new(MemoryHandle::default()));
 
             let handle = SharedHandle::init(mem_handle.clone());
             let (_frame_sender, frame_receiver) = channel();
@@ -407,9 +401,9 @@ mod tests {
 
             let obj = RenderObject::new(Sprite::default(), object_coordinate);
             if in_bounds {
-                let _ = panel
+                panel
                     .write_object(obj)
-                    .expect(&format!("Test case {} failed to write object to handle", i)[..]);
+                    .unwrap_or_else(|_| panic!("Test case {i} failed to write object to handle"));
 
                 let actual_string = vec_vec_u8_to_string!(panel.next_frame.get_chars());
 
@@ -429,7 +423,7 @@ mod tests {
         let top_left = Coord::default();
         let bottom_right = Coord::new(10, 10);
         let square = Square::new(top_left, bottom_right);
-        let mem_handle = Arc::new(Mutex::new(MemoryHandle::new()));
+        let mem_handle = Arc::new(Mutex::new(MemoryHandle::default()));
 
         let handle = SharedHandle::init(mem_handle.clone());
         let (_frame_sender, frame_receiver) = channel();
@@ -447,9 +441,9 @@ mod tests {
         let obj_3 = RenderObject::new(Sprite::default(), object_coordinate_3);
         let object_coordinate_4 = Coord3d::new(13, 12, 2);
         let obj_4 = RenderObject::new(Sprite::default(), object_coordinate_4);
-        let _ = panel
+        panel
             .calculate_next_frame(vec![obj_0, obj_1, obj_2, obj_3, obj_4])
-            .expect(&format!("Failed to write object to handle")[..]);
+            .unwrap_or_else(|_| panic!("Failed to write object to handle"));
         let actual_string = vec_vec_u8_to_string!(panel.next_frame.get_chars());
         let expected = "           \nXX X       \n  XX X     \nXX  X      \n   X X     \n           \n         X \n          X\n         X \n           \n           ";
 
@@ -464,7 +458,7 @@ mod tests {
         let top_left = Coord::default();
         let bottom_right = Coord::new(10, 10);
         let square = Square::new(top_left, bottom_right);
-        let mem_handle = Arc::new(Mutex::new(MemoryHandle::new()));
+        let mem_handle = Arc::new(Mutex::new(MemoryHandle::default()));
 
         let handle = SharedHandle::init(mem_handle.clone());
         let (_frame_sender, frame_receiver) = channel();
@@ -482,9 +476,9 @@ mod tests {
         let obj_3 = RenderObject::new(Sprite::default(), object_coordinate_3);
         let object_coordinate_4 = Coord3d::new(13, 12, 2);
         let obj_4 = RenderObject::new(Sprite::default(), object_coordinate_4);
-        let _ = panel
+        panel
             .calculate_next_frame(vec![obj_0, obj_1, obj_2, obj_3, obj_4])
-            .expect(&format!("Failed to write object to handle")[..]);
+            .unwrap_or_else(|_| panic!("Failed to write object to handle"));
         let actual_string = vec_vec_u8_to_string!(panel.next_frame.get_chars());
         let expected = "           \nXX X       \n  XX X     \nXX  X      \n   X X     \n           \n         X \n          X\n         X \n           \n           ";
 

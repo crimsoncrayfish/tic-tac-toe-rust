@@ -2,7 +2,6 @@ use std::{
     fmt::Debug,
     io::{self, Write},
     ops::Add,
-    usize,
 };
 
 use crate::{
@@ -13,8 +12,9 @@ use crate::{
 
 use super::{handle::Handle, handle_error::HandleError};
 
-/// The behavior of `MemoryHandle` shoudld be as similar to the `StdOut` behaviour as possible.
+/// The behavior of `MemoryHandle` shoudl be as similar to the `StdOut` behaviour as possible.
 /// It is used for unit/simulation testing
+#[derive(Default)]
 pub struct MemoryHandle {
     pub buffer: Vec<Vec<u8>>,
     buffer_temp: Vec<Vec<u8>>,
@@ -28,26 +28,11 @@ pub struct MemoryHandle {
 }
 
 impl MemoryHandle {
-    pub fn new() -> Self {
-        MemoryHandle {
-            buffer: Vec::new(),
-            buffer_temp: Vec::new(),
-            foreground_color_buffer: Vec::new(),
-            foreground_color_buffer_temp: Vec::new(),
-            background_color_buffer: Vec::new(),
-            background_color_buffer_temp: Vec::new(),
-            current_cursor_location: Usize2d::default(),
-            current_background_color: TerminalColors::default(),
-            current_foreground_color: TerminalColors::default(),
-        }
-    }
-}
-impl MemoryHandle {
     pub fn get_buffer_content(&self) -> Vec<u8> {
-        if self.buffer.len() == 0 {
+        if self.buffer.is_empty() {
             return Vec::new();
         }
-        assert!(self.buffer.len() > 0);
+        assert!(!self.buffer.is_empty());
         let mut result: Vec<u8> = Vec::with_capacity(self.buffer_temp.len() * 2 - 1);
 
         for index in 0..self.buffer_temp.len() {
@@ -154,7 +139,7 @@ impl Handle for MemoryHandle {
         Ok(())
     }
     fn write_to_location(&mut self, buf: &[u8], coord: Coord) -> Result<usize, HandleError> {
-        let _ = self.set_cursor_location(coord)?;
+        self.set_cursor_location(coord)?;
         self.write(buf).map_err(|_| HandleError::WriteFailed)
     }
 }
@@ -172,7 +157,7 @@ mod tests {
 
     #[test]
     fn hello_world() {
-        let mut handle = MemoryHandle::new();
+        let mut handle = MemoryHandle::default();
         let test_str: &[u8] = b"Hello world";
         let result = handle.write(test_str);
         assert!(result.is_ok(), "Write should not fail");
@@ -193,7 +178,7 @@ mod tests {
 
     #[test]
     fn hello_rust() {
-        let mut handle = MemoryHandle::new();
+        let mut handle = MemoryHandle::default();
         let test_str: &[u8] = b"Hello world";
         let write_result = handle.write(test_str);
         assert!(write_result.is_ok());
@@ -221,7 +206,7 @@ mod tests {
 
     #[test]
     fn set_location() {
-        let mut handle = MemoryHandle::new();
+        let mut handle = MemoryHandle::default();
 
         let result = handle.set_cursor_location(Usize2d::new(5, 2));
         assert!(result.is_ok());
@@ -246,7 +231,7 @@ mod tests {
     }
     #[test]
     fn set_colors() {
-        let mut handle = MemoryHandle::new();
+        let mut handle = MemoryHandle::default();
 
         let result = handle.set_foreground_color(TC::Red);
         assert!(result.is_ok());

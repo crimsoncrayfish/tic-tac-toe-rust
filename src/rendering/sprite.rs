@@ -1,5 +1,3 @@
-use std::usize;
-
 use crate::{
     assert_r,
     shared::{
@@ -53,10 +51,8 @@ impl Sprite {
     /// * `width` - The total number of characters that the sprite is wide
     /// * `height` - The total number of characters that the sprite is tall
     /// * `chars` - The characters that makes up the sprite as a `Vec<Vec<u8>>`
-    /// * `background_colors` - The colors that makes up the sprite's background as a
-    /// `Vec<Vec<TerminalColors>>`
-    /// * `foreground_colors` - The colors that makes up the sprite's foreground as a
-    /// `Vec<Vec<TerminalColors>>`
+    /// * `background_colors` - The colors that makes up the sprite's background as a `Vec<Vec<TerminalColors>>`
+    /// * `foreground_colors` - The colors that makes up the sprite's foreground as a `Vec<Vec<TerminalColors>>`
     ///
     /// # Result
     ///
@@ -79,13 +75,13 @@ impl Sprite {
             chars.len(),
             height
         );
-        for index in 0..chars.len() {
+        for (index, item) in chars.iter().enumerate() {
             assert_eq!(
-                chars[index].len(),
+                item.len(),
                 width,
                 "The width of the sprite on row {} is wrong. Width read: {}, Width in metadata: {}",
                 index,
-                chars[index].len(),
+                item.len(),
                 width
             );
         }

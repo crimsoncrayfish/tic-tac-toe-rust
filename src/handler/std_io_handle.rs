@@ -11,9 +11,9 @@ pub struct StdIOHandle {
     handle: Stdout,
 }
 
-impl StdIOHandle {
-    pub fn new() -> Self {
-        StdIOHandle {
+impl Default for StdIOHandle {
+    fn default() -> Self {
+        Self {
             handle: std::io::stdout(),
         }
     }
@@ -57,7 +57,7 @@ impl Handle for StdIOHandle {
         buf: &[u8],
         coord: crate::shared::usize2d::Coord,
     ) -> Result<usize, HandleError> {
-        let _ = self.set_cursor_location(coord)?;
+        self.set_cursor_location(coord)?;
         self.write(buf).map_err(|_| HandleError::WriteFailed)
     }
 }

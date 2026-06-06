@@ -1,4 +1,4 @@
-use std::{fmt::Debug, io::Write, usize};
+use std::{fmt::Debug, io::Write};
 
 use crate::{
     rendering::colors::TerminalColors,

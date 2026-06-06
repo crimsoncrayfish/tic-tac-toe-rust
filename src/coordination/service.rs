@@ -1,19 +1,19 @@
 use crate::{
-    panel::panel::Panel,
+    panel::actual::Panel,
     shared::{pixel_grid::Frame, usize2d::Usize2d},
 };
 use std::sync::mpsc::{channel, Receiver, Sender};
 
 pub struct CoordinatorService {
-    state: bool,
-    panels: Vec<Panel>,
+    _state: bool,
+    _panels: Vec<Panel>,
 }
 
 impl CoordinatorService {
     pub fn init() -> Self {
         CoordinatorService {
-            state: true,
-            panels: Vec::new(),
+            _state: true,
+            _panels: Vec::new(),
         }
     }
     pub fn new_sender_receiver<T>() -> (Sender<T>, Receiver<T>) {
@@ -33,7 +33,7 @@ mod tests {
     #[test]
     fn init() {
         let service = CoordinatorService::init();
-        assert_eq!(service.state, true, "After initialization, the service should have a property called state that is set to 'true'");
-        assert_eq!(service.panels.len(), 0, "After initialization, the service should have a property called windowa that is an empty Vec of Window");
+        assert!(service._state, "After initialization, the service should have a property called state that is set to 'true'");
+        assert_eq!(service._panels.len(), 0, "After initialization, the service should have a property called panels that is an empty Vec of Window");
     }
 }

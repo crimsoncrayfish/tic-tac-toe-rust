@@ -1,8 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 use crate::{
-    rendering::colors::TerminalColors as TC,
-    utils::{vec_t_writer::write_vec_2d, vec_vec_helper::assert_vecs_shape_match},
+    assert_shape_match, rendering::colors::TerminalColors as TC, utils::vec_t_writer::write_vec_2d,
     vec_vec_enum_to_string, vec_vec_u8_to_string,
 };
 
@@ -41,7 +40,7 @@ impl Default for PixelGrid {
 }
 
 impl PixelGrid {
-    /// Get a new empty instance of a `Frame`
+    /// Get a new empty instance of a `PixelGrid`
     ///
     /// # Arguments
     ///
@@ -50,12 +49,12 @@ impl PixelGrid {
     ///
     /// # Returns
     ///
-    /// a new frame with the character, background and foreground colors set to default values
+    /// a new grid of pixels with the char, background and foreground colors set to default values
     ///
     /// # Examples
     ///
     /// ```
-    /// let frame = Frame::new_empty(10, 15);
+    /// let pg = PixelGrid::new_empty(10, 15);
     ///
     /// ```
     pub fn default_with_size(cols: usize, rows: usize) -> Self {
@@ -65,7 +64,7 @@ impl PixelGrid {
             foreground_colors: vec![vec![TC::Default; cols]; rows],
         }
     }
-    /// Get a new instance of a `Frame`
+    /// Get a new instance of a `PixelGrid`
     ///
     /// # Arguments
     ///
@@ -88,12 +87,12 @@ impl PixelGrid {
         background_colors: Vec<Vec<TC>>,
         foreground_colors: Vec<Vec<TC>>,
     ) -> Self {
-        assert_vecs_shape_match::<u8, TC>(
+        assert_shape_match!(
             &chars,
             &background_colors,
             "Background colors should match the chars",
         );
-        assert_vecs_shape_match::<u8, TC>(
+        assert_shape_match!(
             &chars,
             &foreground_colors,
             "Background colors should match the chars",
@@ -169,6 +168,22 @@ impl PixelGrid {
     pub fn len(&self) -> usize {
         self.chars.len()
     }
+    /// Check if PixelGrid is empty
+    ///
+    /// # Returns
+    ///
+    /// the `bool` representing if the PixelGrid is empty
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let frame = Frame::new(vec![vec![b'a']], vec![vec![TerminalColors::Red]], vec![vec![TerminalColors::Blue]]);
+    /// let is_empty = frame.is_empty();
+    ///
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        self.chars.is_empty()
+    }
     /// Get the number of cols for the frame
     ///
     /// # Returns
@@ -179,7 +194,7 @@ impl PixelGrid {
     /// # Examples
     ///
     /// ```
-    /// let frame = Frame::new(vec![vec![b'a']], vec![vec![TerminalColors::Red]], vec![vec![TerminalColors::Blue]]);
+    /// let pg = PixelGrid::new(vec![vec![b'a']], vec![vec![TerminalColors::Red]], vec![vec![TerminalColors::Blue]]);
     /// let width = frame.width();
     ///
     /// ```
@@ -197,9 +212,9 @@ impl PixelGrid {
     /// # Examples
     ///
     /// ```
-    /// let frame = Frame::new(vec![vec![b'a']], vec![vec![TerminalColors::Red]], vec![vec![TerminalColors::Blue]]);
-    /// let frame2 = Frame::new(vec![vec![b'b']], vec![vec![TerminalColors::Red]], vec![vec![TerminalColors::Blue]]);
-    /// frame.write_subframe(frame2, Coord::default());
+    /// let pg = PixelGrid::new(vec![vec![b'a']], vec![vec![TerminalColors::Red]], vec![vec![TerminalColors::Blue]]);
+    /// let pg2 = PixelGrid::new(vec![vec![b'b']], vec![vec![TerminalColors::Red]], vec![vec![TerminalColors::Blue]]);
+    /// pg.write_subframe(pg2, Coord::default());
     /// ```
     pub fn write_subframe(&mut self, other: PixelGrid, coord: Coord) {
         assert!(self.len() >= other.len() + coord.y,"length of the Pixelgrid being written plus the coordinate should not exceed the current Pixelgrid");

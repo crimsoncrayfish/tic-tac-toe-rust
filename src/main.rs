@@ -13,9 +13,9 @@ pub mod coordination {
     pub mod service;
 }
 pub mod panel {
+    pub mod actual;
     pub mod command_enum;
     pub mod errors;
-    pub mod panel;
     pub mod state;
 }
 pub mod rendering {
@@ -45,31 +45,14 @@ fn main() -> Result<(), SystemException> {
     let _x_len: usize = read_config(&args, "--x-len".to_string(), 10);
     let _service = CoordinatorService::init();
 
-    return Ok(());
+    Ok(())
 }
 
 #[derive(Debug)]
 enum SystemException {
-    _GameException,
-    _InputReaderException,
-    _CoordinatorException,
-    _RedererException,
-    _WindowsException,
+    _Game,
+    _InputReader,
+    _Coordinator,
+    _Rederer,
+    _Windows,
 }
-
-/// Placeholder
-///
-/// # Arguments
-///
-/// * `my_input` - my input
-///
-/// #Returns
-///
-/// Does placeholder stuff
-///
-/// # Examples
-///
-/// ```
-/// let x = placeholder()
-/// ```
-pub fn placeholder() {}

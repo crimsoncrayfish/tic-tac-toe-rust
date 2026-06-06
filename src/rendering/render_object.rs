@@ -15,8 +15,7 @@ impl RenderObject {
     /// # Arguments
     ///
     /// * `sprite` - a `Sprite` to be rendered
-    /// * `coord` - a coordinate in 3d space. Objects with higher z coordinates will be rendered on
-    /// top of objects with smaller z coordinates
+    /// * `coord` - a coordinate in 3d space. Objects with higher z coordinates will be rendered on top of objects with smaller z coordinates
     ///
     /// # Returns
     ///

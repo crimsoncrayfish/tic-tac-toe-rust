@@ -67,9 +67,9 @@ impl Square {
             bottom_right.y
         );
         Square {
-            top_left: top_left.clone(),
+            top_left,
             _top_right: Usize2d::new(bottom_right.x, top_left.y),
-            bottom_right: bottom_right.clone(),
+            bottom_right,
             _bottom_left: Usize2d::new(top_left.x, bottom_right.y),
         }
     }
@@ -381,7 +381,7 @@ pub mod test {
         ];
 
         for (i, (coordinate, expected_result)) in test_cases.iter().enumerate() {
-            let result = square.clone().is_in_square(coordinate.clone());
+            let result = square.is_in_square(*coordinate);
             assert_eq!(
                 result, *expected_result,
                 "Test case {}: Got: {:?}, Expected: {:?}, With: {} and {}",
@@ -422,7 +422,7 @@ pub mod test {
         let bottom_right = Usize2d::new(17, 21);
 
         let result = catch_unwind(|| {
-            let _ = Square::new(top_left.clone(), bottom_right.clone());
+            let _ = Square::new(top_left, bottom_right);
         });
 
         assert!(result.is_err(), "Expected panic, but no panic occurred");
@@ -445,7 +445,7 @@ pub mod test {
         let bottom_right = Usize2d::new(17, 21);
 
         let result = catch_unwind(|| {
-            let _ = Square::new(top_left.clone(), bottom_right.clone());
+            let _ = Square::new(top_left, bottom_right);
         });
 
         assert!(result.is_err(), "Expected panic, but no panic occurred");
