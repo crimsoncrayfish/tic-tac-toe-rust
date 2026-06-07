@@ -2,24 +2,19 @@ use std::{
     error::Error,
     fmt::Display,
     io::{self, Write},
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, MutexGuard},
 };
 
-use super::{handle::Handle, handle_error::HandleError, std_io_handle::StdIOHandle};
+use super::{handle::Handle, handle_error::HandleError};
 
 #[derive(Debug)]
-pub struct SharedHandle {
-    handle: Arc<Mutex<dyn Handle>>,
+pub struct SharedHandle<H: Handle> {
+    handle: Arc<Mutex<Box<H>>>,
 }
 
-impl SharedHandle {
-    pub fn init(writer: Arc<Mutex<dyn Handle>>) -> Self {
+impl<H: Handle> SharedHandle<H> {
+    pub fn init(writer: Arc<Mutex<Box<H>>>) -> Self {
         SharedHandle { handle: writer }
-    }
-    pub fn init_std_out() -> Self {
-        SharedHandle {
-            handle: Arc::new(Mutex::new(StdIOHandle::default())),
-        }
     }
     pub fn write(&self, args: std::fmt::Arguments) -> Result<(), SharedWriterErr> {
         let mut locked_writer = match self.handle.lock() {
@@ -46,8 +41,15 @@ impl SharedHandle {
         let _ = locked_writer.flush();
         Ok(())
     }
+    pub fn lock(&self) -> Result<MutexGuard<Box<H>>, SharedWriterErr> {
+        let locked_writer = match self.handle.lock() {
+            Ok(result) => result,
+            Err(_) => return Err(SharedWriterErr::FailedToLock),
+        };
+        Ok(locked_writer)
+    }
 }
-impl Write for SharedHandle {
+impl<H: Handle> Write for SharedHandle<H> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let mut locked_writer = self
             .handle
@@ -70,7 +72,7 @@ impl Write for SharedHandle {
         locked_writer.write_fmt(fmt)
     }
 }
-impl Handle for SharedHandle {
+impl<H: Handle> Handle for SharedHandle<H> {
     fn set_cursor_location(
         &mut self,
         coord: crate::shared::usize2d::Usize2d,
@@ -112,6 +114,14 @@ impl Handle for SharedHandle {
     }
 }
 
+impl<H: Handle> Clone for SharedHandle<H> {
+    fn clone(&self) -> Self {
+        Self {
+            handle: Arc::clone(&self.handle),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum SharedWriterErr {
     FailedToLock,
@@ -147,7 +157,7 @@ mod tests {
 
     #[test]
     fn hello_world() {
-        let buffer = Arc::new(Mutex::new(MemoryHandle::default()));
+        let buffer = Arc::new(Mutex::new(Box::new(MemoryHandle::default())));
         let writer = SharedHandle::init(buffer.clone());
         let test_str = "Hello world";
         match writer.write(format_args!("{}", test_str)) {
@@ -162,4 +172,5 @@ mod tests {
 
         assert_eq!(test_str, result);
     }
+    // TODO: more testing here
 }

@@ -37,6 +37,15 @@ impl Display for Usize3d {
         write!(f, "x: {}, y: {}, z: {}", self.x, self.y, self.z)
     }
 }
+impl Usize3d {
+    pub fn add_signed(self, dx: isize, dy: isize, dz: isize) -> Self {
+        Usize3d {
+            x: self.x.checked_add_signed(dx).unwrap_or(0),
+            y: self.y.checked_add_signed(dy).unwrap_or(0),
+            z: self.z.checked_add_signed(dz).unwrap_or(0),
+        }
+    }
+}
 impl Add for Usize3d {
     type Output = Usize3d;
     /// Add two Usize3d's together

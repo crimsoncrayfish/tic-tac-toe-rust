@@ -2,6 +2,7 @@ use std::{
     fmt::Debug,
     io::{self, Write},
     ops::Add,
+    sync::{Arc, Mutex},
 };
 
 use crate::{
@@ -28,6 +29,9 @@ pub struct MemoryHandle {
 }
 
 impl MemoryHandle {
+    pub fn new_a_m_b() -> Arc<Mutex<Box<dyn Handle>>> {
+        Arc::new(Mutex::new(Box::new(Self::default())))
+    }
     pub fn get_buffer_content(&self) -> Vec<u8> {
         if self.buffer.is_empty() {
             return Vec::new();
