@@ -3,7 +3,7 @@ use std::{
 };
 
 use crate::{
-    handler::handle::Handle,
+    handler::{handle::Handle, shared_handle::SharedHandle},
     rendering::{colors::TerminalColors, render_object::RenderObject},
     shared::{
         pixel_grid::{Frame, PixelGrid},
@@ -31,7 +31,7 @@ pub struct Panel<H: Handle> {
     frame_receiver: Receiver<Vec<RenderObject>>,
     command_receiver: Receiver<PanelCommandEnum>,
     state: PanelState,
-    _out_handle: H,
+    _out_handle: SharedHandle<H>,
 }
 impl<H: Handle + 'static> Panel<H> {
     /// Initialize an instance of Panel
@@ -64,7 +64,7 @@ impl<H: Handle + 'static> Panel<H> {
         area: Square,
         frame_receiver: Receiver<Vec<RenderObject>>,
         command_receiver: Receiver<PanelCommandEnum>,
-        handle: H,
+        handle: SharedHandle<H>,
     ) -> Result<Self, PanelError> {
         let new_state = PixelGrid::default_with_size(area.width(), area.height());
         Ok(Panel {
@@ -166,23 +166,31 @@ impl<H: Handle + 'static> Panel<H> {
     /// panel.write();
     /// ```
     pub fn write(&mut self) -> Result<(), PanelError> {
+        //TODO: this isnt making use of locking properly
+        // im writing and then flushing later
+        let mut h = match self._out_handle.lock() {
+            Ok(handle) => handle,
+            Err(_) => {
+                return Err(PanelError::WriteFailed);
+            }
+        };
         for row_index in 0..self.next_frame.len() {
-            self._out_handle.set_cursor_location(self.area.get_top_left().add(Coord::new(0, row_index))).map_err(|_| PanelError::WriteFailed)?;
+            h.set_cursor_location(self.area.get_top_left().add(Coord::new(0, row_index))).map_err(|_| PanelError::WriteFailed)?;
             for col_index in 0..self.next_frame.width() {
-                self._out_handle.set_foreground_color(self.next_frame.get_foreground_colors()[row_index][col_index]).map_err(|_| PanelError::WriteFailed)?;
-                self._out_handle.set_background_color(self.next_frame.get_background_colors()[row_index][col_index]).map_err(|_| PanelError::WriteFailed)?;
+                h.set_foreground_color(self.next_frame.get_foreground_colors()[row_index][col_index]).map_err(|_| PanelError::WriteFailed)?;
+                h.set_background_color(self.next_frame.get_background_colors()[row_index][col_index]).map_err(|_| PanelError::WriteFailed)?;
                 //
                 //let x = [b'b'];
-                self._out_handle.write(&[self.next_frame.get_chars()[row_index][col_index]]).map_err(|_| PanelError::WriteFailed)?;
+                h.write(&[self.next_frame.get_chars()[row_index][col_index]]).map_err(|_| PanelError::WriteFailed)?;
             }
             // TODO: process the row by comparing it to the previous frame?
             //if similarity is > 70% write partial with cursor moves
             //if similarity is < 70% write full line
         }
-        self._out_handle.set_foreground_color(TerminalColors::ResetFgOnly).map_err(|_| PanelError::WriteFailed)?;
-        self._out_handle.set_background_color(TerminalColors::ResetBgOnly).map_err(|_| PanelError::WriteFailed)?;
+        h.set_foreground_color(TerminalColors::ResetFgOnly).map_err(|_| PanelError::WriteFailed)?;
+        h.set_background_color(TerminalColors::ResetBgOnly).map_err(|_| PanelError::WriteFailed)?;
   
-        self._out_handle.flush().map_err(|_| PanelError::WriteFailed)?;
+        h.flush().map_err(|_| PanelError::WriteFailed)?;
         self._previous_frame = std::mem::replace(&mut self.next_frame, Frame::default_with_size(self.area.width(), self.area.height()));
 
         Ok(())
@@ -221,7 +229,7 @@ impl<H: Handle + 'static> Panel<H> {
         area: Square,
         frame_receiver: Receiver<Vec<RenderObject>>,
         command_receiver: Receiver<PanelCommandEnum>,
-        handle: H,
+        handle: SharedHandle<H>,
     ) -> Result<JoinHandle<()>, PanelError> {
         let mut w = Panel::init(area, frame_receiver, command_receiver, handle)?;
         let panel_closure = move || {
@@ -296,7 +304,7 @@ mod tests {
         let top_left = Usize2d::new(0, 0);
         let bottom_right = Usize2d::new(10, 20);
         let square = Square::new(top_left, bottom_right);
-        let handle = MemoryHandle::default();
+        let handle = SharedHandle::init(Arc::new(Mutex::new(Box::new(MemoryHandle::default()))));
         let (_, frame_receiver) = channel();
         let (_, command_receiver) = channel();
 
@@ -327,7 +335,7 @@ mod tests {
         let bottom_right = Usize2d::new(10, 20);
         let square = Square::new(top_left, bottom_right);
 
-        let handle = MemoryHandle::default();
+        let handle = SharedHandle::init(Arc::new(Mutex::new(Box::new(MemoryHandle::default()))));
         let (_, frame_receiver) = channel();
         let (command_sender, command_receiver) = channel();
 
@@ -350,7 +358,7 @@ mod tests {
         let bottom_right = Usize2d::new(10, 20);
         let square = Square::new(top_left, bottom_right);
 
-        let handle = MemoryHandle::default();
+        let handle = SharedHandle::init(Arc::new(Mutex::new(Box::new(MemoryHandle::default()))));
         let (_frame_sender, frame_receiver) = channel();
         let (command_sender, command_receiver) = channel();
 

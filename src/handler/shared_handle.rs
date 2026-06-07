@@ -2,7 +2,7 @@ use std::{
     error::Error,
     fmt::Display,
     io::{self, Write},
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, MutexGuard},
 };
 
 use super::{handle::Handle, handle_error::HandleError};
@@ -40,6 +40,13 @@ impl<H: Handle> SharedHandle<H> {
         };
         let _ = locked_writer.flush();
         Ok(())
+    }
+    pub fn lock(&self) -> Result<MutexGuard<Box<H>>, SharedWriterErr> {
+        let locked_writer = match self.handle.lock() {
+            Ok(result) => result,
+            Err(_) => return Err(SharedWriterErr::FailedToLock),
+        };
+        Ok(locked_writer)
     }
 }
 impl<H: Handle> Write for SharedHandle<H> {
