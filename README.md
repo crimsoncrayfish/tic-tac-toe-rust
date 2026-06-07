@@ -1,5 +1,11 @@
 # tic-tac-toe-rust
 
+## Demo
+
+spawn 2 panels at different locations
+
+https://github.com/user-attachments/assets/12a9a4df-06f2-4f3f-9512-8d1c1c747344
+
 ## Goal
 
 - [ ] learn Rust
