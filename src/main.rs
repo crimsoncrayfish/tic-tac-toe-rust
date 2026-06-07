@@ -1,6 +1,15 @@
 use coordination::service::CoordinatorService;
-use std::env;
+use std::{
+    env,
+    sync::{mpsc::channel, Arc, Mutex},
+};
 use utils::arg_helper::read_config;
+
+use crate::{
+    handler::{shared_handle::SharedHandle, std_io_handle::StdIOHandle},
+    panel::actual::Panel,
+    shared::{square::Square, usize2d::Usize2d},
+};
 
 pub mod utils {
     pub mod arg_helper;
@@ -43,7 +52,21 @@ fn main() -> Result<(), SystemException> {
     let args: Vec<String> = env::args().collect();
 
     let _x_len: usize = read_config(&args, "--x-len".to_string(), 10);
-    let _service = CoordinatorService::init();
+    let _service = CoordinatorService::<SharedHandle<StdIOHandle>>::init();
+    let handle = handler::shared_handle::SharedHandle::<StdIOHandle>::init(Arc::new(Mutex::new(
+        Box::new(StdIOHandle::default()),
+    )));
+    let (_, frame_receiver) = channel();
+    let (_, command_receiver) = channel();
+    let panel = Panel::init(
+        Square::new(Usize2d::new(0, 0), Usize2d::new(10, 10)),
+        frame_receiver,
+        command_receiver,
+        handle,
+    );
+    if let Ok(mut p) = panel {
+        _ = p.run();
+    }
 
     Ok(())
 }

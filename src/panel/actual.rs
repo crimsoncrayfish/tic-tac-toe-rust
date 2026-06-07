@@ -24,17 +24,17 @@ use super::{command_enum::PanelCommandEnum, errors::PanelError, state::PanelStat
 /// All data processed by this panel should render inside this area. Data is sent to the panel
 /// through a sender in the form of list of renderable sprites `Vec<RenderObject>`
 #[derive(Debug)]
-pub struct Panel {
+pub struct Panel<H: Handle> {
     _previous_frame: Frame,
     next_frame: Frame,
     area: Square, // TODO: DO i even want this since all objects are now relative to the panel
     frame_receiver: Receiver<Vec<RenderObject>>,
     command_receiver: Receiver<PanelCommandEnum>,
     state: PanelState,
-    _out_handle: Box<dyn Handle>,
+    _out_handle: H,
 }
-impl Panel {
-    /// Initialize an instance of Window
+impl<H: Handle + 'static> Panel<H> {
+    /// Initialize an instance of Panel
     ///
     /// # Arguments
     ///
@@ -42,11 +42,11 @@ impl Panel {
     /// * `top_left` - the top left most coordinate for the frame
     /// * `bottom_right` - the bottom right most coordinate for the frame
     /// * `frame_receiver` - receives the next frame to be printed
-    /// * `command_receiver` - receives the commands for the window e.g. kill_process, resize_window
+    /// * `command_receiver` - receives the commands for the panel e.g. kill_process, resize_panel
     ///
     /// #Returns
     ///
-    /// An instance of a window
+    /// An instance of a panel
     ///
     /// # Examples
     ///
@@ -58,15 +58,15 @@ impl Panel {
     /// let (_, frame_receiver) = channel();
     /// let (_, command_receiver) = channel();
     ///
-    /// let window= Window::init(size, top_left, bottom_right, frame_receiver, command_receiver);
+    /// let panel = Panel::init(size, top_left, bottom_right, frame_receiver, command_receiver);
     /// ```
-    fn init(
+    pub fn init(
         area: Square,
         frame_receiver: Receiver<Vec<RenderObject>>,
         command_receiver: Receiver<PanelCommandEnum>,
-        handle: Box<dyn Handle>,
+        handle: H,
     ) -> Result<Self, PanelError> {
-        let new_state = Frame::default_with_size(area.width(), area.height());
+        let new_state = PixelGrid::default_with_size(area.width(), area.height());
         Ok(Panel {
             _previous_frame: new_state.clone(),
             next_frame: new_state.clone(),
@@ -78,13 +78,13 @@ impl Panel {
         })
     }
 
-    /// Run the window process
+    /// Run the panel process
     ///
     /// # Examples
     ///
     /// ```
-    /// let window= Window::init(...);
-    /// window.run();
+    /// let panel = Panel::init(...);
+    /// panel.run();
     /// ```
     pub fn run(&mut self) -> Result<(), PanelError> {
         loop {
@@ -109,7 +109,7 @@ impl Panel {
     /// # Examples
     ///
     /// ```
-    /// let window= Window::init(...);
+    /// let panel = Panel::init(...);
     /// let render_objects = vec![
     ///     RenderObject {
     ///         coordinate: Usize2d::default(),
@@ -120,7 +120,7 @@ impl Panel {
     ///         ]
     ///     }
     /// ];
-    /// window.process_frame(render_objects);
+    /// panel.process_frame(render_objects);
     /// ```
     pub fn calculate_next_frame(
         &mut self,
@@ -145,7 +145,7 @@ impl Panel {
     /// # Examples
     ///
     /// ```
-    /// let window= Window::init(...);
+    /// let panel = Panel::init(...);
     /// let render_objects = vec![
     ///     RenderObject {
     ///         coordinate: Usize2d::default(),
@@ -156,8 +156,8 @@ impl Panel {
     ///         ]
     ///     }
     /// ];
-    /// window.calculate_next_frame(render_objects);
-    /// window.write();
+    /// panel.calculate_next_frame(render_objects);
+    /// panel.write();
     /// ```
     pub fn write(&mut self) -> Result<(), PanelError> {
         for row_index in 0..self.next_frame.len() {
@@ -186,7 +186,7 @@ impl Panel {
     /// * `top_left` - the top left most coordinate for the frame
     /// * `bottom_right` - the bottom right most coordinate for the frame
     /// * `frame_receiver` - receives the next frame to be printed
-    /// * `command_receiver` - receives the commands for the window e.g. kill_process, resize_window
+    /// * `command_receiver` - receives the commands for the panel e.g. kill_process, resize_panel
     ///
     /// # Returns
     ///
@@ -203,20 +203,20 @@ impl Panel {
     /// let (_, frame_receiver) = channel();
     /// let (_, command_receiver) = channel();
     ///
-    /// let handle= Window::init_run_async(size, top_left, bottom_right, frame_receiver, command_receiver);
+    /// let handle= Panel::init_run_async(size, top_left, bottom_right, frame_receiver, command_receiver);
     /// handle.join().unwrap();
     /// ```
     pub fn init_run_async(
         area: Square,
         frame_receiver: Receiver<Vec<RenderObject>>,
         command_receiver: Receiver<PanelCommandEnum>,
-        handle: Box<dyn Handle>,
+        handle: H,
     ) -> Result<JoinHandle<()>, PanelError> {
         let mut w = Panel::init(area, frame_receiver, command_receiver, handle)?;
-        let window_closure = move || {
+        let panel_closure = move || {
             let _ = w.run();
         };
-        Ok(spawn(window_closure))
+        Ok(spawn(panel_closure))
     }
     /// Write a `RenderObject` to the handle
     ///
@@ -285,28 +285,28 @@ mod tests {
         let top_left = Usize2d::new(0, 0);
         let bottom_right = Usize2d::new(10, 20);
         let square = Square::new(top_left, bottom_right);
-        let handle = Box::new(MemoryHandle::default());
+        let handle = MemoryHandle::default();
         let (_, frame_receiver) = channel();
         let (_, command_receiver) = channel();
 
-        let window = Panel::init(square, frame_receiver, command_receiver, handle);
-        assert!(window.is_ok());
-        let window = window.unwrap();
+        let panel= Panel::init(square, frame_receiver, command_receiver, handle);
+        assert!(panel.is_ok());
+        let panel = panel.unwrap();
         let expected = Frame::default_with_size(11, 21);
 
         assert_eq!(
-            window._previous_frame,
+            panel._previous_frame,
             expected,
             "Default initialization previous frame is wrong. Expected lenth: {}, Actual length: {}",
             expected.len(),
-            window._previous_frame.len()
+            panel._previous_frame.len()
         );
         assert_eq!(
-            window.next_frame,
+            panel.next_frame,
             expected,
             "Default initialization for next frame is wrong. Expected lenth: {}, Actual length: {}",
             expected.len(),
-            window.next_frame.len()
+            panel.next_frame.len()
         );
     }
 
@@ -316,7 +316,7 @@ mod tests {
         let bottom_right = Usize2d::new(10, 20);
         let square = Square::new(top_left, bottom_right);
 
-        let handle = Box::new(MemoryHandle::default());
+        let handle = MemoryHandle::default();
         let (_, frame_receiver) = channel();
         let (command_sender, command_receiver) = channel();
 
@@ -339,7 +339,7 @@ mod tests {
         let bottom_right = Usize2d::new(10, 20);
         let square = Square::new(top_left, bottom_right);
 
-        let handle = Box::new(MemoryHandle::default());
+        let handle = MemoryHandle::default();
         let (_frame_sender, frame_receiver) = channel();
         let (command_sender, command_receiver) = channel();
 
@@ -390,13 +390,13 @@ mod tests {
 
         for (i, top_left, bottom_right, object_coordinate, expected, in_bounds) in test_cases {
             let square = Square::new(top_left, bottom_right);
-            let mem_handle = Arc::new(Mutex::new(MemoryHandle::default()));
+            let mem_handle = Arc::new(Mutex::new(Box::new(MemoryHandle::default())));
 
             let handle = SharedHandle::init(mem_handle.clone());
             let (_frame_sender, frame_receiver) = channel();
             let (_, command_receiver) = channel();
 
-            let mut panel = Panel::init(square, frame_receiver, command_receiver, Box::new(handle))
+            let mut panel = Panel::init(square, frame_receiver, command_receiver, handle)
                 .expect("Failed to init the panel");
 
             let obj = RenderObject::new(Sprite::default(), object_coordinate);
@@ -423,13 +423,13 @@ mod tests {
         let top_left = Coord::default();
         let bottom_right = Coord::new(10, 10);
         let square = Square::new(top_left, bottom_right);
-        let mem_handle = Arc::new(Mutex::new(MemoryHandle::default()));
+        let mem_handle = Arc::new(Mutex::new(Box::new(MemoryHandle::default())));
 
         let handle = SharedHandle::init(mem_handle.clone());
         let (_frame_sender, frame_receiver) = channel();
         let (_, command_receiver) = channel();
 
-        let mut panel = Panel::init(square, frame_receiver, command_receiver, Box::new(handle))
+        let mut panel = Panel::init(square, frame_receiver, command_receiver, handle)
             .expect("Failed to init the panel");
         let object_coordinate_0 = Coord3d::new(0, 1, 0);
         let obj_0 = RenderObject::new(Sprite::default(), object_coordinate_0);
@@ -458,13 +458,13 @@ mod tests {
         let top_left = Coord::default();
         let bottom_right = Coord::new(10, 10);
         let square = Square::new(top_left, bottom_right);
-        let mem_handle = Arc::new(Mutex::new(MemoryHandle::default()));
+        let mem_handle = Arc::new(Mutex::new(Box::new(MemoryHandle::default())));
 
         let handle = SharedHandle::init(mem_handle.clone());
         let (_frame_sender, frame_receiver) = channel();
         let (_, command_receiver) = channel();
 
-        let mut panel = Panel::init(square, frame_receiver, command_receiver, Box::new(handle))
+        let mut panel = Panel::init(square, frame_receiver, command_receiver, handle)
             .expect("Failed to init the panel");
         let object_coordinate_0 = Coord3d::new(0, 1, 0);
         let obj_0 = RenderObject::new(Sprite::default(), object_coordinate_0);
@@ -502,7 +502,7 @@ mod tests {
             expected, actual
         );
     }
-    fn get_shared_mem_handle_content(handle: Arc<Mutex<MemoryHandle>>) -> String {
+    fn get_shared_mem_handle_content(handle: Arc<Mutex<Box<MemoryHandle>>>) -> String {
         let locked_writer_result = handle.lock();
         let guard = locked_writer_result.unwrap();
         let locked = &*guard;

@@ -1,15 +1,16 @@
 use crate::{
+    handler::handle::Handle,
     panel::actual::Panel,
     shared::{pixel_grid::Frame, usize2d::Usize2d},
 };
 use std::sync::mpsc::{channel, Receiver, Sender};
 
-pub struct CoordinatorService {
+pub struct CoordinatorService<H: Handle> {
     _state: bool,
-    _panels: Vec<Panel>,
+    _panels: Vec<Panel<H>>,
 }
 
-impl CoordinatorService {
+impl<H: Handle> CoordinatorService<H> {
     pub fn init() -> Self {
         CoordinatorService {
             _state: true,
@@ -28,11 +29,13 @@ impl CoordinatorService {
 
 #[cfg(test)]
 mod tests {
+    use crate::handler::memory_handle::MemoryHandle;
+
     use super::*;
 
     #[test]
     fn init() {
-        let service = CoordinatorService::init();
+        let service = CoordinatorService::<MemoryHandle>::init();
         assert!(service._state, "After initialization, the service should have a property called state that is set to 'true'");
         assert_eq!(service._panels.len(), 0, "After initialization, the service should have a property called panels that is an empty Vec of Window");
     }
