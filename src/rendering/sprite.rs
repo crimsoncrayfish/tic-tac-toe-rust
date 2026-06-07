@@ -92,6 +92,46 @@ impl Sprite {
             pixels: PixelGrid::new(chars, background_colors, foreground_colors),
         }
     }
+    /// Create a new instance of a sprite from a PixelGrid
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the sprite
+    /// * `width` - The total number of characters that the sprite is wide
+    /// * `height` - The total number of characters that the sprite is tall
+    /// * `grid` - The pixels that make up the sprite
+    ///
+    /// # Result
+    ///
+    /// The sprite
+    ///
+    /// # Example
+    ///
+    pub fn new_from_grid(name: String, width: usize, height: usize, grid: PixelGrid) -> Self {
+        /*assert_eq!(
+            grid.get_chars().len(),
+            height,
+            "The height of the sprite is wrong. Length read: {}, Length in metadata: {}",
+            grid.get_chars().first().unwrap("What").len(),
+            height
+        );
+        for (index, item) in chars.iter().enumerate() {
+            assert_eq!(
+                item.len(),
+                width,
+                "The width of the sprite on row {} is wrong. Width read: {}, Width in metadata: {}",
+                index,
+                item.len(),
+                width
+            );
+        }*/
+        Sprite {
+            _name: name,
+            width,
+            height,
+            pixels: grid,
+        }
+    }
     ///
     /// Get the sprite content to be rendered given a coordinate and a space to write to
     ///

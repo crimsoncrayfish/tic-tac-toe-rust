@@ -1,10 +1,10 @@
 use std::{
-    ops::Add, sync::mpsc::Receiver, thread::{spawn, JoinHandle}
+    ops::Add, sync::mpsc::Receiver, thread::{JoinHandle, spawn}, time::Duration
 };
 
 use crate::{
     handler::handle::Handle,
-    rendering::render_object::RenderObject,
+    rendering::{colors::TerminalColors, render_object::RenderObject},
     shared::{
         pixel_grid::{Frame, PixelGrid},
         shared_errors::SharedErrors,
@@ -96,10 +96,18 @@ impl<H: Handle + 'static> Panel<H> {
                 break;
             }
 
-            if let Ok(render_objects) = self.frame_receiver.try_recv() {
-                self.calculate_next_frame(render_objects)?;
+            //TODO: Improve this. added 10 sec delay on trying to receive frames to not pin the cpu
+            //at 100%
+            match self.frame_receiver.recv_timeout(Duration::from_millis(10)) {
+                Ok(render_objects) => {
+                    self.calculate_next_frame(render_objects)?;
+                    self.write()?;
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    return Err(PanelError::ReceiveDisconnect);
+                }
             }
-            self.write()?;
         }
         Ok(())
     }
@@ -128,14 +136,12 @@ impl<H: Handle + 'static> Panel<H> {
     ) -> Result<(), PanelError> {
         render_objects.sort_by_key(|k| k.get_location().z);
         for object in render_objects {
-            // TODO: This should write to the current frame in stead of the Handle
-            let _was_written = self.write_object(object);
-
-            // TODO: log when an object was not written
+            if  self.write_object(object).is_err() {
+                // TODO: log when an object was not written
+            }
         }
         Ok(())
     }
-
     /// Write the next frame to the handle
     ///
     /// #Returns
@@ -165,12 +171,17 @@ impl<H: Handle + 'static> Panel<H> {
             for col_index in 0..self.next_frame.width() {
                 self._out_handle.set_foreground_color(self.next_frame.get_foreground_colors()[row_index][col_index]).map_err(|_| PanelError::WriteFailed)?;
                 self._out_handle.set_background_color(self.next_frame.get_background_colors()[row_index][col_index]).map_err(|_| PanelError::WriteFailed)?;
+                //
+                //let x = [b'b'];
                 self._out_handle.write(&[self.next_frame.get_chars()[row_index][col_index]]).map_err(|_| PanelError::WriteFailed)?;
             }
             // TODO: process the row by comparing it to the previous frame?
             //if similarity is > 70% write partial with cursor moves
             //if similarity is < 70% write full line
         }
+        self._out_handle.set_foreground_color(TerminalColors::ResetFgOnly).map_err(|_| PanelError::WriteFailed)?;
+        self._out_handle.set_background_color(TerminalColors::ResetBgOnly).map_err(|_| PanelError::WriteFailed)?;
+  
         self._out_handle.flush().map_err(|_| PanelError::WriteFailed)?;
         self._previous_frame = std::mem::replace(&mut self.next_frame, Frame::default_with_size(self.area.width(), self.area.height()));
 

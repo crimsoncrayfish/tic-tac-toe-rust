@@ -107,6 +107,14 @@ impl<H: Handle> Handle for SharedHandle<H> {
     }
 }
 
+impl<H: Handle> Clone for SharedHandle<H> {
+    fn clone(&self) -> Self {
+        Self {
+            handle: Arc::clone(&self.handle),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum SharedWriterErr {
     FailedToLock,
